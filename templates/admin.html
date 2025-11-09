@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - RPi Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f0f2f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input[type="text"], input[type="tel"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        .message {
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .pin-display {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            font-family: monospace;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚙️ Admin Panel</h1>
+        <a href="/" class="back-btn">← Back to Chat</a>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Change PIN</h2>
+            <div class="message" id="pinMessage"></div>
+
+            <form id="pinForm" onsubmit="changePin(event)">
+                <div class="form-group">
+                    <label for="newPin">New 6-Digit PIN:</label>
+                    <input type="tel" id="newPin" required maxlength="6" inputmode="numeric" placeholder="000000">
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPin">Confirm PIN:</label>
+                    <input type="tel" id="confirmPin" required maxlength="6" inputmode="numeric" placeholder="000000">
+                </div>
+
+                <button type="submit">Update PIN</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Add Admin User</h2>
+            <div class="message" id="adminMessage"></div>
+
+            <form id="adminForm" onsubmit="addAdmin(event)">
+                <div class="form-group">
+                    <label for="newAdmin">Username:</label>
+                    <input type="text" id="newAdmin" required placeholder="Enter username">
+                </div>
+
+                <button type="submit">Add Admin</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showMessage(elementId, message, isSuccess) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'message show ' + (isSuccess ? 'success' : 'error');
+            setTimeout(() => {
+                element.classList.remove('show');
+            }, 5000);
+        }
+
+        async function changePin(event) {
+            event.preventDefault();
+
+            const newPin = document.getElementById('newPin').value.trim();
+            const confirmPin = document.getElementById('confirmPin').value.trim();
+
+            if (newPin.length !== 6 || !/^\d+$/.test(newPin)) {
+                showMessage('pinMessage', 'PIN must be exactly 6 digits', false);
+                return;
+            }
+
+            if (newPin !== confirmPin) {
+                showMessage('pinMessage', 'PINs do not match', false);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/set-pin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ pin: newPin })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('pinMessage', 'PIN updated successfully!', true);
+                    document.getElementById('pinForm').reset();
+                } else {
+                    showMessage('pinMessage', data.error || 'Failed to update PIN', false);
+                }
+            } catch (error) {
+                console.error('Error updating PIN:', error);
+                showMessage('pinMessage', 'Failed to update PIN', false);
+            }
+        }
+
+        async function addAdmin(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('newAdmin').value.trim();
+
+            if (!username) {
+                showMessage('adminMessage', 'Username is required', false);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/add-admin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('adminMessage', data.message, true);
+                    document.getElementById('adminForm').reset();
+                } else {
+                    showMessage('adminMessage', data.error || 'Failed to add admin', false);
+                }
+            } catch (error) {
+                console.error('Error adding admin:', error);
+                showMessage('adminMessage', 'Failed to add admin', false);
+            }
+        }
+    </script>
+</body>
+</html>

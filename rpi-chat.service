@@ -1,0 +1,15 @@
+[Unit]
+Description=RPi Local Chat Server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/miscellaneous
+Environment="PATH=/home/pi/miscellaneous/venv/bin"
+ExecStart=/home/pi/miscellaneous/venv/bin/python3 /home/pi/miscellaneous/server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

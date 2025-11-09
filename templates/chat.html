@@ -27,13 +27,36 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            z-index: 1000;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .menu-toggle {
+            display: none;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: 5px;
         }
 
         .header h1 {
             font-size: 1.5rem;
         }
 
-        .logout-btn {
+        .header-right {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .logout-btn, .admin-btn {
             background: rgba(255, 255, 255, 0.2);
             color: white;
             border: none;
@@ -43,18 +66,95 @@
             transition: background 0.3s;
         }
 
-        .logout-btn:hover {
+        .logout-btn:hover, .admin-btn:hover {
             background: rgba(255, 255, 255, 0.3);
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: white;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.hidden {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-header {
+            padding: 1rem;
+            border-bottom: 1px solid #ddd;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .channels-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem 0;
+        }
+
+        .channel-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: #333;
+        }
+
+        .channel-item:hover {
+            background: #f8f9fa;
+        }
+
+        .channel-item.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .add-channel-btn {
+            margin: 0.5rem;
+            padding: 0.75rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+
+        .add-channel-btn.show {
+            display: block;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 100%;
         }
 
         .chat-container {
             flex: 1;
             display: flex;
             flex-direction: column;
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto;
             padding: 1rem;
+            overflow: hidden;
+        }
+
+        .current-channel {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #ddd;
         }
 
         .messages {
@@ -172,9 +272,88 @@
             padding: 2rem;
         }
 
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 1rem;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #ddd;
+            color: #333;
+        }
+
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 1.2rem;
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 60px;
+                bottom: 0;
+                z-index: 999;
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            }
+
+            .sidebar.hidden {
+                transform: translateX(-100%);
             }
 
             .input-container {
@@ -223,24 +402,55 @@
 </head>
 <body>
     <div class="header">
-        <h1>💬 RPi Local Chat</h1>
-        <button class="logout-btn" onclick="logout()">Logout</button>
+        <div class="header-left">
+            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            <h1>💬 RPi Chat</h1>
+        </div>
+        <div class="header-right">
+            <button class="admin-btn" id="adminBtn" style="display: none;" onclick="location.href='/admin'">⚙️ Admin</button>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
     </div>
 
-    <div class="chat-container">
-        <div class="messages" id="messages">
-            <div class="empty-state">No messages yet. Start the conversation!</div>
-        </div>
+    <div class="main-container">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">Channels</div>
+            <div class="channels-list" id="channelsList"></div>
+            <button class="add-channel-btn" id="addChannelBtn" onclick="showAddChannelModal()">+ New Channel</button>
+        </aside>
 
-        <div class="input-container">
-            <input type="text" class="username-input" id="username" placeholder="Your name" value="">
-            <input type="text" class="message-input" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
-            <button class="send-btn" onclick="sendMessage()">Send</button>
+        <div class="chat-area">
+            <div class="chat-container">
+                <div class="current-channel" id="currentChannel">#general</div>
+                <div class="messages" id="messages">
+                    <div class="empty-state">No messages yet. Start the conversation!</div>
+                </div>
+
+                <div class="input-container">
+                    <input type="text" class="username-input" id="username" placeholder="Your name" value="">
+                    <input type="text" class="message-input" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="addChannelModal">
+        <div class="modal-content">
+            <h2>Create New Channel</h2>
+            <input type="text" id="newChannelName" placeholder="Channel name (e.g., photos)">
+            <div class="modal-buttons">
+                <button class="btn-primary" onclick="createChannel()">Create</button>
+                <button class="btn-secondary" onclick="hideAddChannelModal()">Cancel</button>
+            </div>
         </div>
     </div>
 
     <script>
+        let currentChannelId = 1; // Default to #general
         let lastMessageId = 0;
+        let channels = [];
+        let isAdmin = false;
 
         // Load username from localStorage
         const usernameInput = document.getElementById('username');
@@ -250,6 +460,99 @@
         usernameInput.addEventListener('change', () => {
             localStorage.setItem('username', usernameInput.value);
         });
+
+        // Check if user is admin
+        async function checkAdmin() {
+            try {
+                const response = await fetch('/api/admin/check');
+                const data = await response.json();
+                isAdmin = data.is_admin;
+
+                if (isAdmin) {
+                    document.getElementById('adminBtn').style.display = 'block';
+                    document.getElementById('addChannelBtn').classList.add('show');
+                }
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('hidden');
+        }
+
+        function showAddChannelModal() {
+            document.getElementById('addChannelModal').classList.add('show');
+            document.getElementById('newChannelName').focus();
+        }
+
+        function hideAddChannelModal() {
+            document.getElementById('addChannelModal').classList.remove('show');
+            document.getElementById('newChannelName').value = '';
+        }
+
+        async function createChannel() {
+            const name = document.getElementById('newChannelName').value.trim();
+            if (!name) return;
+
+            try {
+                const response = await fetch('/api/channels', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, display_name: '#' + name })
+                });
+
+                if (response.ok) {
+                    hideAddChannelModal();
+                    loadChannels();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to create channel');
+                }
+            } catch (error) {
+                console.error('Error creating channel:', error);
+                alert('Failed to create channel');
+            }
+        }
+
+        async function loadChannels() {
+            try {
+                const response = await fetch('/api/channels');
+                channels = await response.json();
+
+                const channelsList = document.getElementById('channelsList');
+                channelsList.innerHTML = channels.map(ch => `
+                    <div class="channel-item ${ch.id === currentChannelId ? 'active' : ''}"
+                         onclick="switchChannel(${ch.id}, '${ch.display_name}')">
+                        ${ch.display_name}
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading channels:', error);
+            }
+        }
+
+        function switchChannel(channelId, displayName) {
+            currentChannelId = channelId;
+            lastMessageId = 0;
+
+            document.getElementById('currentChannel').textContent = displayName;
+            document.getElementById('messages').innerHTML = '<div class="empty-state">Loading...</div>';
+
+            // Update active channel in sidebar
+            document.querySelectorAll('.channel-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Hide sidebar on mobile after selecting channel
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.add('hidden');
+            }
+
+            loadMessages();
+        }
 
         function formatTimestamp(timestamp) {
             const date = new Date(timestamp);
@@ -276,7 +579,7 @@
 
         async function loadMessages() {
             try {
-                const response = await fetch('/api/messages');
+                const response = await fetch(`/api/messages/${currentChannelId}`);
                 const messages = await response.json();
 
                 const messagesDiv = document.getElementById('messages');
@@ -316,7 +619,7 @@
             if (!message) return;
 
             try {
-                const response = await fetch('/api/messages', {
+                const response = await fetch(`/api/messages/${currentChannelId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -344,7 +647,14 @@
             window.location.href = '/logout';
         }
 
-        // Load messages initially and every 2 seconds
+        // Initialize on mobile - hide sidebar by default
+        if (window.innerWidth <= 768) {
+            document.getElementById('sidebar').classList.add('hidden');
+        }
+
+        // Initialize
+        checkAdmin();
+        loadChannels();
         loadMessages();
         setInterval(loadMessages, 2000);
     </script>

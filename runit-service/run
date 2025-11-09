@@ -1,0 +1,4 @@
+#!/bin/sh
+exec 2>&1
+cd /home/pi/miscellaneous
+exec chpst -u pi /home/pi/miscellaneous/venv/bin/python3 /home/pi/miscellaneous/server.py

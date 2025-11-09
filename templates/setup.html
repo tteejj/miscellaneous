@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initial Setup - RPi Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .setup-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .info {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input[type="text"], input[type="tel"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            text-align: center;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <h1>🔧 Initial Setup</h1>
+
+        <div class="info">
+            Welcome! Set up your admin account and PIN to get started.
+        </div>
+
+        <div class="error" id="errorMsg"></div>
+
+        <form id="setupForm" onsubmit="handleSetup(event)">
+            <div class="form-group">
+                <label for="username">Admin Username:</label>
+                <input type="text" id="username" required autofocus placeholder="Your username">
+            </div>
+
+            <div class="form-group">
+                <label for="pin">Create 6-Digit PIN:</label>
+                <input type="tel" id="pin" required maxlength="6" inputmode="numeric" placeholder="000000">
+            </div>
+
+            <div class="form-group">
+                <label for="pinConfirm">Confirm PIN:</label>
+                <input type="tel" id="pinConfirm" required maxlength="6" inputmode="numeric" placeholder="000000">
+            </div>
+
+            <button type="submit">Complete Setup</button>
+        </form>
+    </div>
+
+    <script>
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMsg');
+            errorMsg.textContent = message;
+            errorMsg.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('errorMsg').classList.remove('show');
+        }
+
+        async function handleSetup(event) {
+            event.preventDefault();
+            hideError();
+
+            const username = document.getElementById('username').value.trim();
+            const pin = document.getElementById('pin').value.trim();
+            const pinConfirm = document.getElementById('pinConfirm').value.trim();
+
+            if (!username) {
+                showError('Username is required');
+                return;
+            }
+
+            if (pin.length !== 6 || !/^\d+$/.test(pin)) {
+                showError('PIN must be exactly 6 digits');
+                return;
+            }
+
+            if (pin !== pinConfirm) {
+                showError('PINs do not match');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/set-pin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, pin })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('Setup complete! Redirecting to chat...');
+                    window.location.href = '/';
+                } else {
+                    showError(data.error || 'Setup failed');
+                }
+            } catch (error) {
+                console.error('Setup error:', error);
+                showError('Setup failed. Please try again.');
+            }
+        }
+    </script>
+</body>
+</html>

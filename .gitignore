@@ -1,0 +1,22 @@
+# Virtual environment
+venv/
+env/
+ENV/
+
+# Database
+*.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

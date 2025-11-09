@@ -175,12 +175,12 @@
 
                 if (this.onGround) {
                     // GROUND MECHANICS
-                    // Throttle increases forward speed - MUCH stronger on ground
-                    const groundAccel = this.throttle * 0.8;
+                    // Very strong ground acceleration
+                    const groundAccel = this.throttle * 1.5;
                     this.vx += groundAccel;
 
-                    // Ground friction - less friction to build speed faster
-                    this.vx *= 0.92;
+                    // Minimal friction on ground
+                    this.vx *= 0.95;
 
                     // No vertical velocity on ground
                     this.vy = 0;
@@ -190,10 +190,10 @@
                     // Minimal fuel consumption on ground (taxiing)
                     this.fuel = Math.max(0, this.fuel - 0.005 * this.throttle);
 
-                    // Natural takeoff when fast enough with pitch up
-                    if (this.vx > 4.0 && keys['ArrowUp']) {
+                    // Natural takeoff when fast enough with pitch up - LOWER threshold
+                    if (this.vx > 3.0 && keys['ArrowUp']) {
                         this.onGround = false;
-                        this.vy = -1.5;
+                        this.vy = -3.0; // Stronger initial lift
                     }
 
                 } else {
@@ -1037,14 +1037,14 @@
                 const fuelBar = '|'.repeat(Math.floor(player.fuel / 10));
                 const healthBar = '|'.repeat(Math.floor(player.health / 10));
                 const statusMsg = player.onGround ?
-                    (player.vx < 4.0 ? 'ON GROUND - Build speed (W)!' : 'ON GROUND - Pull up!') :
+                    (player.vx < 3.0 ? 'ON GROUND - Build speed (W)!' : 'ON GROUND - Ready! Pull up!') :
                     'AIRBORNE';
 
                 info.innerHTML = `
                     SCORE: ${score}<br>
                     STATUS: ${statusMsg}<br>
                     ALTITUDE: ${Math.floor(GROUND_LEVEL - player.y)}ft<br>
-                    SPEED: ${Math.floor(Math.sqrt(player.vx * player.vx + player.vy * player.vy) * 10)}kts<br>
+                    SPEED: ${Math.floor(Math.sqrt(player.vx * player.vx + player.vy * player.vy) * 10)}kts (vx: ${player.vx.toFixed(1)})<br>
                     <b>THROTTLE: ${throttleBar}${throttleEmpty} ${Math.floor(player.throttle * 100)}%</b><br>
                     FUEL: ${fuelBar}<br>
                     HEALTH: ${healthBar}<br>

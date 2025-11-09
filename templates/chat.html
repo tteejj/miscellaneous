@@ -54,9 +54,10 @@
         .header-right {
             display: flex;
             gap: 0.5rem;
+            align-items: center;
         }
 
-        .logout-btn, .admin-btn {
+        .logout-btn, .admin-btn, .gallery-btn {
             background: rgba(255, 255, 255, 0.2);
             color: white;
             border: none;
@@ -64,9 +65,11 @@
             border-radius: 5px;
             cursor: pointer;
             transition: background 0.3s;
+            text-decoration: none;
+            font-size: 0.9rem;
         }
 
-        .logout-btn:hover, .admin-btn:hover {
+        .logout-btn:hover, .admin-btn:hover, .gallery-btn:hover {
             background: rgba(255, 255, 255, 0.3);
         }
 
@@ -207,6 +210,36 @@
             word-wrap: break-word;
         }
 
+        .message-image {
+            max-width: 100%;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+
+        .message-image img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+
+        .youtube-preview {
+            margin-top: 0.5rem;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .youtube-preview iframe {
+            width: 100%;
+            height: 315px;
+            border: none;
+        }
+
+        .link-preview {
+            color: #667eea;
+            text-decoration: underline;
+        }
+
         .input-container {
             background: white;
             padding: 1rem;
@@ -215,16 +248,7 @@
             display: flex;
             gap: 0.5rem;
             flex-shrink: 0;
-        }
-
-        .username-input {
-            padding: 0.75rem;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-            width: 150px;
-            -webkit-appearance: none;
-            min-height: 44px;
+            align-items: end;
         }
 
         .message-input {
@@ -236,18 +260,20 @@
             -webkit-appearance: none;
             min-height: 44px;
             min-width: 0;
+            resize: none;
+            font-family: inherit;
         }
 
-        .username-input:focus, .message-input:focus {
+        .message-input:focus {
             outline: none;
             border-color: #667eea;
         }
 
-        .send-btn {
+        .upload-btn, .send-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 0.75rem 1.5rem;
+            padding: 0.75rem 1rem;
             border-radius: 5px;
             font-size: 1rem;
             font-weight: 600;
@@ -255,14 +281,17 @@
             transition: transform 0.2s;
             flex-shrink: 0;
             min-height: 44px;
-            white-space: nowrap;
         }
 
-        .send-btn:hover {
+        .upload-btn {
+            padding: 0.75rem;
+        }
+
+        .upload-btn:hover, .send-btn:hover {
             transform: translateY(-2px);
         }
 
-        .send-btn:active {
+        .upload-btn:active, .send-btn:active {
             transform: translateY(0);
         }
 
@@ -334,6 +363,10 @@
             color: #333;
         }
 
+        #fileInput {
+            display: none;
+        }
+
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 1.2rem;
@@ -358,24 +391,22 @@
 
             .input-container {
                 flex-wrap: wrap;
-                gap: 0.75rem;
+                gap: 0.5rem;
             }
 
-            .username-input {
+            .message-input {
                 width: 100%;
                 order: 1;
             }
 
-            .message-input {
-                width: calc(100% - 90px);
+            .upload-btn {
                 order: 2;
                 flex: 1;
             }
 
             .send-btn {
-                width: 80px;
                 order: 3;
-                padding: 0.75rem;
+                flex: 1;
             }
 
             .chat-container {
@@ -385,17 +416,9 @@
             .messages {
                 margin-bottom: 0.5rem;
             }
-        }
 
-        @media (max-width: 480px) {
-            .message-input {
-                width: 100%;
-                order: 2;
-            }
-
-            .send-btn {
-                width: 100%;
-                order: 3;
+            .youtube-preview iframe {
+                height: 200px;
             }
         }
     </style>
@@ -407,6 +430,7 @@
             <h1>💬 RPi Chat</h1>
         </div>
         <div class="header-right">
+            <button class="gallery-btn" id="galleryBtn" style="display: none;" onclick="openGallery()">📷 Gallery</button>
             <button class="admin-btn" id="adminBtn" style="display: none;" onclick="location.href='/admin'">⚙️ Admin</button>
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
@@ -427,8 +451,9 @@
                 </div>
 
                 <div class="input-container">
-                    <input type="text" class="username-input" id="username" placeholder="Your name" value="">
-                    <input type="text" class="message-input" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+                    <textarea class="message-input" id="messageInput" placeholder="Type a message..." rows="1" onkeypress="handleKeyPress(event)"></textarea>
+                    <input type="file" id="fileInput" accept="image/*" onchange="uploadImage()">
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()" title="Upload Image">📎</button>
                     <button class="send-btn" onclick="sendMessage()">Send</button>
                 </div>
             </div>
@@ -448,18 +473,10 @@
 
     <script>
         let currentChannelId = 1; // Default to #general
+        let currentChannelName = 'general';
         let lastMessageId = 0;
         let channels = [];
         let isAdmin = false;
-
-        // Load username from localStorage
-        const usernameInput = document.getElementById('username');
-        usernameInput.value = localStorage.getItem('username') || '';
-
-        // Save username to localStorage when changed
-        usernameInput.addEventListener('change', () => {
-            localStorage.setItem('username', usernameInput.value);
-        });
 
         // Check if user is admin
         async function checkAdmin() {
@@ -524,17 +541,21 @@
                 const channelsList = document.getElementById('channelsList');
                 channelsList.innerHTML = channels.map(ch => `
                     <div class="channel-item ${ch.id === currentChannelId ? 'active' : ''}"
-                         onclick="switchChannel(${ch.id}, '${ch.display_name}')">
+                         onclick="switchChannel(${ch.id}, '${ch.name}', '${ch.display_name}')">
                         ${ch.display_name}
                     </div>
                 `).join('');
+
+                // Show gallery button if in pictures channel
+                updateGalleryButton();
             } catch (error) {
                 console.error('Error loading channels:', error);
             }
         }
 
-        function switchChannel(channelId, displayName) {
+        function switchChannel(channelId, name, displayName) {
             currentChannelId = channelId;
+            currentChannelName = name;
             lastMessageId = 0;
 
             document.getElementById('currentChannel').textContent = displayName;
@@ -551,7 +572,21 @@
                 document.getElementById('sidebar').classList.add('hidden');
             }
 
+            updateGalleryButton();
             loadMessages();
+        }
+
+        function updateGalleryButton() {
+            const galleryBtn = document.getElementById('galleryBtn');
+            if (currentChannelName === 'pictures') {
+                galleryBtn.style.display = 'block';
+            } else {
+                galleryBtn.style.display = 'none';
+            }
+        }
+
+        function openGallery() {
+            window.location.href = `/gallery/${currentChannelId}`;
         }
 
         function formatTimestamp(timestamp) {
@@ -560,13 +595,42 @@
         }
 
         function renderMessage(msg) {
+            let content = '';
+
+            if (msg.message_type === 'image') {
+                if (msg.loaded && msg.image) {
+                    content = `
+                        <div class="message-image">
+                            <img src="/uploads/thumbnails/${msg.image.thumbnail_filename}"
+                                 onclick="window.open('/uploads/${msg.image.filename}', '_blank')"
+                                 alt="Image">
+                        </div>
+                    `;
+                } else {
+                    content = '<em>Image not loaded (older than 100MB limit)</em>';
+                }
+            } else if (msg.message_type === 'youtube' && msg.metadata) {
+                const videoId = msg.metadata.video_id;
+                content = `
+                    <div class="message-content">${escapeHtml(msg.content)}</div>
+                    <div class="youtube-preview">
+                        <iframe src="https://www.youtube.com/embed/${videoId}"
+                                allowfullscreen></iframe>
+                    </div>
+                `;
+            } else if (msg.message_type === 'link') {
+                content = `<div class="message-content"><a href="${escapeHtml(msg.content)}" target="_blank" class="link-preview">${escapeHtml(msg.content)}</a></div>`;
+            } else {
+                content = `<div class="message-content">${escapeHtml(msg.content)}</div>`;
+            }
+
             return `
                 <div class="message">
                     <div class="message-header">
                         <span class="username">${escapeHtml(msg.username)}</span>
                         <span class="timestamp">${formatTimestamp(msg.timestamp)}</span>
                     </div>
-                    <div class="message-content">${escapeHtml(msg.message)}</div>
+                    ${content}
                 </div>
             `;
         }
@@ -580,7 +644,8 @@
         async function loadMessages() {
             try {
                 const response = await fetch(`/api/messages/${currentChannelId}`);
-                const messages = await response.json();
+                const data = await response.json();
+                const messages = data.messages || [];
 
                 const messagesDiv = document.getElementById('messages');
 
@@ -613,7 +678,6 @@
 
         async function sendMessage() {
             const messageInput = document.getElementById('messageInput');
-            const username = usernameInput.value.trim() || 'Anonymous';
             const message = messageInput.value.trim();
 
             if (!message) return;
@@ -624,11 +688,12 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ username, message })
+                    body: JSON.stringify({ message })
                 });
 
                 if (response.ok) {
                     messageInput.value = '';
+                    messageInput.style.height = 'auto';
                     loadMessages();
                 }
             } catch (error) {
@@ -637,8 +702,44 @@
             }
         }
 
+        async function uploadImage() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) return;
+
+            // Check file size (10MB limit)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File too large. Maximum size is 10MB.');
+                fileInput.value = '';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`/api/upload/${currentChannelId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    fileInput.value = '';
+                    loadMessages();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to upload image');
+                }
+            } catch (error) {
+                console.error('Error uploading image:', error);
+                alert('Failed to upload image');
+            }
+        }
+
         function handleKeyPress(event) {
-            if (event.key === 'Enter') {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
                 sendMessage();
             }
         }
@@ -646,6 +747,13 @@
         function logout() {
             window.location.href = '/logout';
         }
+
+        // Auto-resize textarea
+        const textarea = document.getElementById('messageInput');
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+        });
 
         // Initialize on mobile - hide sidebar by default
         if (window.innerWidth <= 768) {

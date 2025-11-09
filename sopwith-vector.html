@@ -181,12 +181,12 @@
 
                 if (this.onGround) {
                     // GROUND MECHANICS
-                    // Throttle increases forward speed
-                    const groundAccel = this.throttle * 0.12;
+                    // Throttle increases forward speed - MUCH stronger on ground
+                    const groundAccel = this.throttle * 0.8;
                     this.vx += groundAccel;
 
-                    // Ground friction
-                    this.vx *= 0.98;
+                    // Ground friction - less friction to build speed faster
+                    this.vx *= 0.92;
 
                     // No vertical velocity on ground
                     this.vy = 0;

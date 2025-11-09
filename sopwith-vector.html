@@ -157,13 +157,7 @@
             update() {
                 if (this.crashed) return;
 
-                // Throttle control - ALWAYS works
-                if (keys['w'] || keys['W']) {
-                    this.throttle = Math.min(this.throttle + 0.05, 1.0);
-                }
-                if (keys['s'] || keys['S']) {
-                    this.throttle = Math.max(this.throttle - 0.05, 0.0);
-                }
+                // Throttle is now sticky - controlled by key events, not here
 
                 // Pitch control - only when not on ground
                 if (!this.onGround) {
@@ -256,8 +250,21 @@
                 } else {
                     // Check buildings for collision
                     for (let building of buildings) {
-                        if (playerWorldX > building.x && playerWorldX < building.x + building.width) {
-                            groundLevel = GROUND_LEVEL - building.height;
+                        if (!building.destroyed && playerWorldX > building.x && playerWorldX < building.x + building.width) {
+                            const buildingTop = GROUND_LEVEL - building.height;
+                            const buildingLeft = building.x;
+                            const buildingRight = building.x + building.width;
+
+                            // Check if hitting side of building (not coming from above)
+                            if (this.y > buildingTop + 5 && !this.onGround) {
+                                // Hit the side - crash!
+                                this.crashed = true;
+                                explosions.push(new Explosion(this.x + worldOffset, this.y));
+                                gameState = 'gameover';
+                                return;
+                            }
+
+                            groundLevel = buildingTop;
                             flatSurface = building.width > 60;
                             break;
                         }
@@ -268,7 +275,8 @@
                 if (this.y >= groundLevel - 10) {
                     this.y = groundLevel - 10;
 
-                    if (!this.onGround) {
+                    // Only check landing if we were already in the air and coming down
+                    if (!this.onGround && this.vy > 0) {
                         // Landing attempt - check if safe
                         const landingSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
                         const safeAngle = Math.abs(this.angle) < 0.3;
@@ -286,6 +294,9 @@
                             this.angle = 0;
                             this.targetAngle = 0;
                         }
+                    } else if (this.onGround) {
+                        // Stay on ground
+                        this.vy = 0;
                     }
                 } else {
                     // In the air
@@ -723,15 +734,15 @@
             const spawnRate = settings.difficulty === 'easy' ? 0.005 :
                              settings.difficulty === 'normal' ? 0.01 : 0.02;
 
-            // Enemy planes
+            // Enemy planes - spawn high enough to clear buildings (max building height ~120)
             if (Math.random() < spawnRate) {
-                const y = 100 + Math.random() * 200;
+                const y = 80 + Math.random() * 150; // Between 80-230, well above most buildings
                 enemies.push(new Enemy(worldOffset + canvas.width + 100, y));
             }
 
-            // Zeppelins (rare)
+            // Zeppelins (rare) - spawn even higher
             if (Math.random() < spawnRate * 0.2) {
-                const y = 80 + Math.random() * 150;
+                const y = 60 + Math.random() * 100; // Between 60-160, very high
                 zeppelins.push(new Zeppelin(worldOffset + canvas.width + 100, y));
             }
         }
@@ -1021,11 +1032,12 @@
                 player.draw();
 
                 // Draw HUD
-                const throttleBar = '|'.repeat(Math.floor(player.throttle * 10));
+                const throttleBar = '█'.repeat(Math.floor(player.throttle * 10));
+                const throttleEmpty = '░'.repeat(10 - Math.floor(player.throttle * 10));
                 const fuelBar = '|'.repeat(Math.floor(player.fuel / 10));
                 const healthBar = '|'.repeat(Math.floor(player.health / 10));
                 const statusMsg = player.onGround ?
-                    (player.vx < 4.0 ? 'ON GROUND - Build speed!' : 'ON GROUND - Pull up!') :
+                    (player.vx < 4.0 ? 'ON GROUND - Build speed (W)!' : 'ON GROUND - Pull up!') :
                     'AIRBORNE';
 
                 info.innerHTML = `
@@ -1033,7 +1045,7 @@
                     STATUS: ${statusMsg}<br>
                     ALTITUDE: ${Math.floor(GROUND_LEVEL - player.y)}ft<br>
                     SPEED: ${Math.floor(Math.sqrt(player.vx * player.vx + player.vy * player.vy) * 10)}kts<br>
-                    THROTTLE: ${throttleBar}<br>
+                    <b>THROTTLE: ${throttleBar}${throttleEmpty} ${Math.floor(player.throttle * 100)}%</b><br>
                     FUEL: ${fuelBar}<br>
                     HEALTH: ${healthBar}<br>
                     ${settings.weather !== 'clear' ? 'WIND: ' + windEffect.toFixed(1) : ''}
@@ -1090,11 +1102,24 @@
         // Keyboard handling
         let lastFire = 0;
         let lastBomb = 0;
+        let lastThrottle = 0;
 
         window.addEventListener('keydown', (e) => {
             keys[e.key] = true;
 
             if (gameState === 'playing') {
+                // Sticky throttle control - each press adjusts by 25%
+                if ((e.key.toLowerCase() === 'w') && Date.now() - lastThrottle > 100) {
+                    player.throttle = Math.min(player.throttle + 0.25, 1.0);
+                    lastThrottle = Date.now();
+                    e.preventDefault();
+                }
+                if ((e.key.toLowerCase() === 's') && Date.now() - lastThrottle > 100) {
+                    player.throttle = Math.max(player.throttle - 0.25, 0.0);
+                    lastThrottle = Date.now();
+                    e.preventDefault();
+                }
+
                 if (e.key === ' ' && Date.now() - lastFire > 150) {
                     fireBullet();
                     lastFire = Date.now();

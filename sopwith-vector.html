@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOPWITH - Vector Edition</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #gameCanvas {
+            border: 2px solid #0f0;
+            box-shadow: 0 0 20px #0f0;
+            image-rendering: crisp-edges;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="info"></div>
+    <div id="controls">
+        ARROW KEYS: Pitch | SPACE: Fire | B: Bomb | R: Restart
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const info = document.getElementById('info');
+
+        // Set canvas size
+        canvas.width = 1200;
+        canvas.height = 600;
+
+        // Game constants
+        const GRAVITY = 0.15;
+        const GROUND_LEVEL = canvas.height - 80;
+        const SCROLL_SPEED = 2;
+
+        // Game state
+        let gameState = 'start'; // start, playing, gameover
+        let score = 0;
+        let worldOffset = 0;
+
+        // Keyboard state
+        const keys = {};
+
+        // Vector drawing with glow effect
+        function drawLine(x1, y1, x2, y2, color = '#0f0', width = 2) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = color;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawCircle(x, y, radius, color = '#0f0', width = 2) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = color;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawText(text, x, y, size = 16, color = '#0f0') {
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = color;
+            ctx.font = `${size}px 'Courier New', monospace`;
+            ctx.fillText(text, x, y);
+            ctx.shadowBlur = 0;
+        }
+
+        // Player plane
+        class Plane {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = 3;
+                this.vy = 0;
+                this.angle = 0;
+                this.targetAngle = 0;
+                this.health = 100;
+                this.fuel = 100;
+                this.onGround = false;
+                this.crashed = false;
+            }
+
+            update() {
+                if (this.crashed) return;
+
+                // Pitch control
+                if (keys['ArrowUp']) {
+                    this.targetAngle = Math.max(this.targetAngle - 0.05, -Math.PI / 6);
+                } else if (keys['ArrowDown']) {
+                    this.targetAngle = Math.min(this.targetAngle + 0.05, Math.PI / 6);
+                } else {
+                    // Return to level
+                    this.targetAngle *= 0.95;
+                }
+
+                // Smooth angle transition
+                this.angle += (this.targetAngle - this.angle) * 0.1;
+
+                // Apply thrust and gravity
+                if (!this.onGround) {
+                    this.vx += Math.cos(this.angle) * 0.05;
+                    this.vy += Math.sin(this.angle) * 0.05 + GRAVITY;
+
+                    // Drag
+                    this.vx *= 0.99;
+                    this.vy *= 0.99;
+
+                    // Speed limits
+                    this.vx = Math.max(2, Math.min(this.vx, 8));
+                    this.vy = Math.max(-6, Math.min(this.vy, 8));
+                }
+
+                // Update position
+                this.y += this.vy;
+
+                // Ground collision
+                if (this.y >= GROUND_LEVEL - 10) {
+                    this.y = GROUND_LEVEL - 10;
+
+                    // Check landing conditions
+                    if (Math.abs(this.vy) > 2 || Math.abs(this.angle) > 0.3) {
+                        this.crashed = true;
+                        gameState = 'gameover';
+                    } else {
+                        this.onGround = true;
+                        this.vy = 0;
+                        this.angle = 0;
+                        this.targetAngle = 0;
+
+                        // Take off
+                        if (keys['ArrowUp']) {
+                            this.onGround = false;
+                            this.vy = -3;
+                        }
+                    }
+                } else {
+                    this.onGround = false;
+                }
+
+                // Keep plane in view
+                this.x = Math.max(100, Math.min(this.x, canvas.width - 100));
+
+                // Top boundary
+                if (this.y < 50) {
+                    this.y = 50;
+                    this.vy = 0;
+                }
+
+                // Fuel consumption
+                if (!this.onGround) {
+                    this.fuel = Math.max(0, this.fuel - 0.02);
+                    if (this.fuel === 0) {
+                        this.crashed = true;
+                        gameState = 'gameover';
+                    }
+                }
+            }
+
+            draw() {
+                const size = 20;
+                const cos = Math.cos(this.angle);
+                const sin = Math.sin(this.angle);
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                const color = this.crashed ? '#f00' : '#0f0';
+
+                // Fuselage
+                drawLine(-size, 0, size, 0, color);
+
+                // Wings
+                drawLine(-size/2, 0, -size/2, -size*0.8, color);
+                drawLine(size/2, 0, size/2, -size*0.8, color);
+                drawLine(-size*1.2, -size*0.8, size*1.2, -size*0.8, color);
+
+                // Tail
+                drawLine(-size, 0, -size*1.2, -size*0.5, color);
+                drawLine(-size*1.2, -size*0.5, -size*1.3, -size*0.5, color);
+
+                // Propeller (spinning)
+                if (!this.crashed) {
+                    const prop = Date.now() / 50;
+                    drawLine(size, -3, size + 5, -3 + Math.sin(prop) * 5, color);
+                }
+
+                // Landing gear
+                drawLine(-size/3, 0, -size/3, size*0.4, color);
+                drawLine(size/3, 0, size/3, size*0.4, color);
+                drawCircle(-size/3, size*0.5, 3, color);
+                drawCircle(size/3, size*0.5, 3, color);
+
+                ctx.restore();
+            }
+        }
+
+        // Bullet class
+        class Bullet {
+            constructor(x, y, vx, vy) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.life = 100;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+            }
+
+            draw() {
+                drawCircle(this.x - worldOffset, this.y, 2, '#ff0', 2);
+            }
+        }
+
+        // Bomb class
+        class Bomb {
+            constructor(x, y, vx) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = 0;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += GRAVITY;
+            }
+
+            draw() {
+                const sx = this.x - worldOffset;
+                drawCircle(sx, this.y, 4, '#f80', 2);
+            }
+        }
+
+        // Building class
+        class Building {
+            constructor(x, width, height) {
+                this.x = x;
+                this.width = width;
+                this.height = height;
+                this.destroyed = false;
+            }
+
+            draw() {
+                if (this.destroyed) return;
+
+                const sx = this.x - worldOffset;
+                const y = GROUND_LEVEL;
+
+                // Building outline
+                drawLine(sx, y, sx, y - this.height, '#0f0');
+                drawLine(sx, y - this.height, sx + this.width, y - this.height, '#0f0');
+                drawLine(sx + this.width, y - this.height, sx + this.width, y, '#0f0');
+
+                // Windows
+                for (let i = 10; i < this.height - 10; i += 15) {
+                    for (let j = 10; j < this.width - 10; j += 15) {
+                        drawLine(sx + j, y - i, sx + j + 5, y - i, '#0f0', 1);
+                        drawLine(sx + j, y - i, sx + j, y - i - 5, '#0f0', 1);
+                        drawLine(sx + j + 5, y - i, sx + j + 5, y - i - 5, '#0f0', 1);
+                        drawLine(sx + j, y - i - 5, sx + j + 5, y - i - 5, '#0f0', 1);
+                    }
+                }
+            }
+
+            checkCollision(obj) {
+                if (this.destroyed) return false;
+                return obj.x > this.x && obj.x < this.x + this.width &&
+                       obj.y > GROUND_LEVEL - this.height && obj.y < GROUND_LEVEL;
+            }
+        }
+
+        // Enemy plane class
+        class Enemy {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = -2;
+                this.vy = 0;
+                this.angle = Math.PI;
+                this.destroyed = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += Math.sin(Date.now() / 500 + this.x / 100) * 0.5;
+
+                // Remove if off screen
+                if (this.x < worldOffset - 200) {
+                    this.destroyed = true;
+                }
+            }
+
+            draw() {
+                if (this.destroyed) return;
+
+                const sx = this.x - worldOffset;
+                const size = 15;
+
+                ctx.save();
+                ctx.translate(sx, this.y);
+                ctx.rotate(this.angle);
+
+                // Simple enemy plane
+                drawLine(-size, 0, size, 0, '#f00');
+                drawLine(-size*0.8, -size*0.6, size*0.8, -size*0.6, '#f00');
+                drawLine(0, 0, 0, -size*0.6, '#f00');
+
+                ctx.restore();
+            }
+
+            checkCollision(obj) {
+                if (this.destroyed) return false;
+                const dx = obj.x - this.x;
+                const dy = obj.y - this.y;
+                return Math.sqrt(dx*dx + dy*dy) < 20;
+            }
+        }
+
+        // Explosion class
+        class Explosion {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.life = 30;
+                this.particles = [];
+                for (let i = 0; i < 20; i++) {
+                    this.particles.push({
+                        x: 0,
+                        y: 0,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: (Math.random() - 0.5) * 8
+                    });
+                }
+            }
+
+            update() {
+                this.life--;
+                this.particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vx *= 0.95;
+                    p.vy *= 0.95;
+                });
+            }
+
+            draw() {
+                const sx = this.x - worldOffset;
+                const alpha = this.life / 30;
+                this.particles.forEach(p => {
+                    drawLine(sx + p.x, this.y + p.y,
+                            sx + p.x + p.vx, this.y + p.y + p.vy,
+                            `rgba(255, ${100 + alpha * 155}, 0, ${alpha})`, 2);
+                });
+            }
+        }
+
+        // Game objects
+        let player = new Plane(200, 200);
+        let bullets = [];
+        let bombs = [];
+        let buildings = [];
+        let enemies = [];
+        let explosions = [];
+
+        // Generate initial world
+        function generateWorld() {
+            buildings = [];
+            let x = 200;
+            for (let i = 0; i < 20; i++) {
+                const width = 40 + Math.random() * 60;
+                const height = 40 + Math.random() * 100;
+                buildings.push(new Building(x, width, height));
+                x += width + 50 + Math.random() * 200;
+            }
+        }
+
+        generateWorld();
+
+        // Spawn enemies
+        function spawnEnemy() {
+            if (gameState === 'playing' && Math.random() < 0.01) {
+                const y = 100 + Math.random() * 200;
+                enemies.push(new Enemy(worldOffset + canvas.width + 100, y));
+            }
+        }
+
+        // Fire bullet
+        function fireBullet() {
+            const bulletSpeed = 10;
+            const vx = player.vx + Math.cos(player.angle) * bulletSpeed;
+            const vy = player.vy + Math.sin(player.angle) * bulletSpeed;
+            const x = player.x + worldOffset + Math.cos(player.angle) * 25;
+            const y = player.y + Math.sin(player.angle) * 25;
+            bullets.push(new Bullet(x, y, vx, vy));
+        }
+
+        // Drop bomb
+        function dropBomb() {
+            const x = player.x + worldOffset;
+            const y = player.y + 10;
+            bombs.push(new Bomb(x, y, player.vx));
+        }
+
+        // Main game loop
+        function gameLoop() {
+            // Clear screen
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (gameState === 'start') {
+                drawText('SOPWITH', canvas.width / 2 - 80, canvas.height / 2 - 50, 32);
+                drawText('Vector Edition', canvas.width / 2 - 100, canvas.height / 2, 20);
+                drawText('Press SPACE to Start', canvas.width / 2 - 140, canvas.height / 2 + 50, 20);
+
+                if (keys[' ']) {
+                    gameState = 'playing';
+                    player = new Plane(200, 200);
+                    bullets = [];
+                    bombs = [];
+                    explosions = [];
+                    enemies = [];
+                    worldOffset = 0;
+                    score = 0;
+                    generateWorld();
+                }
+            } else if (gameState === 'playing') {
+                // Update world scroll
+                worldOffset += player.vx;
+
+                // Update player
+                player.update();
+
+                // Spawn enemies
+                spawnEnemy();
+
+                // Update bullets
+                bullets = bullets.filter(b => {
+                    b.update();
+
+                    // Check enemy hits
+                    for (let enemy of enemies) {
+                        if (enemy.checkCollision(b)) {
+                            enemy.destroyed = true;
+                            explosions.push(new Explosion(enemy.x, enemy.y));
+                            score += 100;
+                            return false;
+                        }
+                    }
+
+                    return b.life > 0 && b.y < canvas.height;
+                });
+
+                // Update bombs
+                bombs = bombs.filter(b => {
+                    b.update();
+
+                    // Check building hits
+                    for (let building of buildings) {
+                        if (building.checkCollision(b)) {
+                            building.destroyed = true;
+                            explosions.push(new Explosion(b.x, GROUND_LEVEL - building.height/2));
+                            score += 50;
+                            return false;
+                        }
+                    }
+
+                    // Check ground hit
+                    if (b.y >= GROUND_LEVEL) {
+                        explosions.push(new Explosion(b.x, GROUND_LEVEL));
+                        return false;
+                    }
+
+                    return true;
+                });
+
+                // Update enemies
+                enemies = enemies.filter(e => {
+                    e.update();
+
+                    // Check player collision
+                    if (e.checkCollision(player)) {
+                        player.crashed = true;
+                        explosions.push(new Explosion(player.x + worldOffset, player.y));
+                        gameState = 'gameover';
+                    }
+
+                    return !e.destroyed;
+                });
+
+                // Update explosions
+                explosions = explosions.filter(e => {
+                    e.update();
+                    return e.life > 0;
+                });
+
+                // Check building collisions with player
+                for (let building of buildings) {
+                    if (building.checkCollision({x: player.x + worldOffset, y: player.y})) {
+                        player.crashed = true;
+                        explosions.push(new Explosion(player.x + worldOffset, player.y));
+                        gameState = 'gameover';
+                    }
+                }
+
+                // Draw ground
+                drawLine(0, GROUND_LEVEL, canvas.width, GROUND_LEVEL, '#0f0');
+
+                // Draw horizon/sky
+                for (let i = 0; i < 5; i++) {
+                    const y = 50 + i * 30;
+                    const offset = (worldOffset * (0.2 + i * 0.1)) % 100;
+                    for (let x = -offset; x < canvas.width; x += 100) {
+                        drawLine(x, y, x + 50, y, '#0f0', 1);
+                    }
+                }
+
+                // Draw buildings
+                buildings.forEach(b => b.draw());
+
+                // Draw enemies
+                enemies.forEach(e => e.draw());
+
+                // Draw bullets
+                bullets.forEach(b => b.draw());
+
+                // Draw bombs
+                bombs.forEach(b => b.draw());
+
+                // Draw explosions
+                explosions.forEach(e => e.draw());
+
+                // Draw player
+                player.draw();
+
+                // Draw HUD
+                info.innerHTML = `
+                    SCORE: ${score}<br>
+                    ALTITUDE: ${Math.floor(GROUND_LEVEL - player.y)}<br>
+                    SPEED: ${Math.floor(player.vx)}<br>
+                    FUEL: ${Math.floor(player.fuel)}%
+                `;
+
+            } else if (gameState === 'gameover') {
+                // Continue drawing game state
+                drawLine(0, GROUND_LEVEL, canvas.width, GROUND_LEVEL, '#0f0');
+                buildings.forEach(b => b.draw());
+                enemies.forEach(e => e.draw());
+                bullets.forEach(b => b.draw());
+                bombs.forEach(b => b.draw());
+                explosions.forEach(e => {
+                    e.update();
+                    e.draw();
+                });
+                player.draw();
+
+                // Game over message
+                drawText('CRASHED!', canvas.width / 2 - 80, canvas.height / 2 - 30, 32, '#f00');
+                drawText(`Final Score: ${score}`, canvas.width / 2 - 100, canvas.height / 2 + 20, 20);
+                drawText('Press R to Restart', canvas.width / 2 - 120, canvas.height / 2 + 60, 20);
+
+                info.innerHTML = `
+                    SCORE: ${score}<br>
+                    CRASHED!
+                `;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Keyboard handling
+        let lastFire = 0;
+        let lastBomb = 0;
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+
+            if (gameState === 'playing') {
+                if (e.key === ' ' && Date.now() - lastFire > 200) {
+                    fireBullet();
+                    lastFire = Date.now();
+                    e.preventDefault();
+                }
+
+                if (e.key.toLowerCase() === 'b' && Date.now() - lastBomb > 500) {
+                    dropBomb();
+                    lastBomb = Date.now();
+                    e.preventDefault();
+                }
+            }
+
+            if (e.key.toLowerCase() === 'r' && gameState === 'gameover') {
+                gameState = 'start';
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Start game loop
+        gameLoop();
+    </script>
+</body>
+</html>

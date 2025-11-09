@@ -39,7 +39,18 @@
             left: 10px;
             color: #0f0;
             text-shadow: 0 0 10px #0f0;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        #highscores {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
             font-size: 14px;
+            line-height: 1.6;
         }
     </style>
 </head>
@@ -47,27 +58,42 @@
     <canvas id="gameCanvas"></canvas>
     <div id="info"></div>
     <div id="controls">
-        ARROW KEYS: Pitch | SPACE: Fire | B: Bomb | R: Restart
+        W/S: Throttle | ↑/↓: Pitch | SPACE: Fire Gun | B: Drop Bomb | R: Restart
     </div>
+    <div id="highscores"></div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const info = document.getElementById('info');
+        const highscoresDiv = document.getElementById('highscores');
 
         // Set canvas size
         canvas.width = 1200;
         canvas.height = 600;
 
+        // Game settings
+        let settings = {
+            difficulty: 'normal', // easy, normal, hard
+            weather: 'clear', // clear, windy, stormy
+            windStrength: 0
+        };
+
         // Game constants
         const GRAVITY = 0.15;
         const GROUND_LEVEL = canvas.height - 80;
-        const SCROLL_SPEED = 2;
 
         // Game state
-        let gameState = 'start'; // start, playing, gameover
+        let gameState = 'start'; // start, playing, gameover, settings, nameentry
         let score = 0;
         let worldOffset = 0;
+        let windEffect = 0;
+        let rainDrops = [];
+
+        // High scores
+        let highScores = JSON.parse(localStorage.getItem('sopwithHighScores') || '[]');
+        let playerName = ['A', 'A', 'A'];
+        let nameIndex = 0;
 
         // Keyboard state
         const keys = {};
@@ -107,99 +133,147 @@
 
         // Player plane
         class Plane {
-            constructor(x, y) {
+            constructor(x, y, onGround = true) {
                 this.x = x;
                 this.y = y;
-                this.vx = 3;
+                this.vx = 0;
                 this.vy = 0;
+                this.throttle = 0;
                 this.angle = 0;
                 this.targetAngle = 0;
                 this.health = 100;
                 this.fuel = 100;
-                this.onGround = false;
+                this.onGround = onGround;
                 this.crashed = false;
             }
 
             update() {
                 if (this.crashed) return;
 
+                // Throttle control
+                if (keys['w'] || keys['W']) {
+                    this.throttle = Math.min(this.throttle + 0.05, 1.0);
+                }
+                if (keys['s'] || keys['S']) {
+                    this.throttle = Math.max(this.throttle - 0.05, 0.0);
+                }
+
                 // Pitch control
                 if (keys['ArrowUp']) {
-                    this.targetAngle = Math.max(this.targetAngle - 0.05, -Math.PI / 6);
+                    this.targetAngle = Math.max(this.targetAngle - 0.05, -Math.PI / 5);
                 } else if (keys['ArrowDown']) {
-                    this.targetAngle = Math.min(this.targetAngle + 0.05, Math.PI / 6);
+                    this.targetAngle = Math.min(this.targetAngle + 0.05, Math.PI / 5);
                 } else {
-                    // Return to level
                     this.targetAngle *= 0.95;
                 }
 
                 // Smooth angle transition
                 this.angle += (this.targetAngle - this.angle) * 0.1;
 
-                // Apply thrust and gravity
                 if (!this.onGround) {
-                    this.vx += Math.cos(this.angle) * 0.05;
-                    this.vy += Math.sin(this.angle) * 0.05 + GRAVITY;
+                    // Apply thrust
+                    const thrust = this.throttle * 0.15;
+                    this.vx += Math.cos(this.angle) * thrust;
+                    this.vy += Math.sin(this.angle) * thrust;
+
+                    // Gravity
+                    this.vy += GRAVITY;
+
+                    // Wind effect
+                    this.vx += windEffect * 0.01;
 
                     // Drag
                     this.vx *= 0.99;
                     this.vy *= 0.99;
 
                     // Speed limits
-                    this.vx = Math.max(2, Math.min(this.vx, 8));
-                    this.vy = Math.max(-6, Math.min(this.vy, 8));
+                    const maxSpeed = 10;
+                    const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                    if (speed > maxSpeed) {
+                        this.vx = (this.vx / speed) * maxSpeed;
+                        this.vy = (this.vy / speed) * maxSpeed;
+                    }
+
+                    // Minimum forward speed
+                    if (this.vx < 1.5) {
+                        this.vx = Math.max(this.vx, 1.5);
+                    }
+
+                    // Fuel consumption
+                    this.fuel = Math.max(0, this.fuel - 0.015 * (1 + this.throttle));
+                    if (this.fuel === 0) {
+                        this.crashed = true;
+                        explosions.push(new Explosion(this.x + worldOffset, this.y));
+                        gameState = 'gameover';
+                    }
                 }
 
                 // Update position
                 this.y += this.vy;
 
+                // Find ground level at current position
+                let groundLevel = GROUND_LEVEL;
+                let flatSurface = true;
+
+                // Check for airfield (flat landing area at start)
+                const playerWorldX = this.x + worldOffset;
+                if (playerWorldX < 500) {
+                    groundLevel = GROUND_LEVEL;
+                    flatSurface = true;
+                } else {
+                    // Check buildings for collision
+                    for (let building of buildings) {
+                        if (playerWorldX > building.x && playerWorldX < building.x + building.width) {
+                            groundLevel = GROUND_LEVEL - building.height;
+                            flatSurface = building.width > 60;
+                            break;
+                        }
+                    }
+                }
+
                 // Ground collision
-                if (this.y >= GROUND_LEVEL - 10) {
-                    this.y = GROUND_LEVEL - 10;
+                if (this.y >= groundLevel - 10) {
+                    this.y = groundLevel - 10;
 
                     // Check landing conditions
-                    if (Math.abs(this.vy) > 2 || Math.abs(this.angle) > 0.3) {
+                    const landingSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                    const safeAngle = Math.abs(this.angle) < 0.25;
+                    const safeSpeed = landingSpeed < 4.5;
+                    const safeDescent = Math.abs(this.vy) < 3;
+
+                    if (!flatSurface || !safeAngle || !safeSpeed || !safeDescent) {
                         this.crashed = true;
+                        explosions.push(new Explosion(this.x + worldOffset, this.y));
                         gameState = 'gameover';
                     } else {
                         this.onGround = true;
                         this.vy = 0;
+                        this.vx *= 0.95;
                         this.angle = 0;
                         this.targetAngle = 0;
 
                         // Take off
-                        if (keys['ArrowUp']) {
+                        if (this.throttle > 0.5 && keys['ArrowUp']) {
                             this.onGround = false;
-                            this.vy = -3;
+                            this.vy = -2;
                         }
                     }
                 } else {
                     this.onGround = false;
                 }
 
-                // Keep plane in view
+                // Keep plane in view (but allow some freedom)
                 this.x = Math.max(100, Math.min(this.x, canvas.width - 100));
 
                 // Top boundary
                 if (this.y < 50) {
                     this.y = 50;
-                    this.vy = 0;
-                }
-
-                // Fuel consumption
-                if (!this.onGround) {
-                    this.fuel = Math.max(0, this.fuel - 0.02);
-                    if (this.fuel === 0) {
-                        this.crashed = true;
-                        gameState = 'gameover';
-                    }
+                    this.vy = Math.max(0, this.vy);
                 }
             }
 
             draw() {
                 const size = 20;
-                const cos = Math.cos(this.angle);
-                const sin = Math.sin(this.angle);
 
                 ctx.save();
                 ctx.translate(this.x, this.y);
@@ -219,9 +293,10 @@
                 drawLine(-size, 0, -size*1.2, -size*0.5, color);
                 drawLine(-size*1.2, -size*0.5, -size*1.3, -size*0.5, color);
 
-                // Propeller (spinning)
+                // Propeller (spinning speed based on throttle)
                 if (!this.crashed) {
-                    const prop = Date.now() / 50;
+                    const propSpeed = 30 + this.throttle * 20;
+                    const prop = Date.now() / propSpeed;
                     drawLine(size, -3, size + 5, -3 + Math.sin(prop) * 5, color);
                 }
 
@@ -246,7 +321,7 @@
             }
 
             update() {
-                this.x += this.vx;
+                this.x += this.vx + windEffect * 0.02;
                 this.y += this.vy;
                 this.life--;
             }
@@ -266,7 +341,7 @@
             }
 
             update() {
-                this.x += this.vx;
+                this.x += this.vx + windEffect * 0.02;
                 this.y += this.vy;
                 this.vy += GRAVITY;
             }
@@ -274,6 +349,7 @@
             draw() {
                 const sx = this.x - worldOffset;
                 drawCircle(sx, this.y, 4, '#f80', 2);
+                drawLine(sx, this.y - 5, sx, this.y - 8, '#f80', 2);
             }
         }
 
@@ -292,7 +368,6 @@
                 const sx = this.x - worldOffset;
                 const y = GROUND_LEVEL;
 
-                // Building outline
                 drawLine(sx, y, sx, y - this.height, '#0f0');
                 drawLine(sx, y - this.height, sx + this.width, y - this.height, '#0f0');
                 drawLine(sx + this.width, y - this.height, sx + this.width, y, '#0f0');
@@ -324,13 +399,31 @@
                 this.vy = 0;
                 this.angle = Math.PI;
                 this.destroyed = false;
+                this.fireTimer = Math.random() * 200;
             }
 
             update() {
                 this.x += this.vx;
-                this.y += Math.sin(Date.now() / 500 + this.x / 100) * 0.5;
 
-                // Remove if off screen
+                // AI difficulty based behavior
+                let aggression = 0.3;
+                if (settings.difficulty === 'easy') aggression = 0.1;
+                if (settings.difficulty === 'hard') aggression = 0.6;
+
+                // Track player
+                const dx = (player.x + worldOffset) - this.x;
+                const dy = player.y - this.y;
+                this.y += Math.sin(Date.now() / 500 + this.x / 100) * 0.5 + dy * aggression * 0.001;
+
+                // Fire at player occasionally
+                if (settings.difficulty !== 'easy') {
+                    this.fireTimer--;
+                    if (this.fireTimer <= 0 && Math.abs(dx) < 300) {
+                        this.fireTimer = 100 + Math.random() * 200;
+                        enemyBullets.push(new Bullet(this.x, this.y, -8, dy * 0.01));
+                    }
+                }
+
                 if (this.x < worldOffset - 200) {
                     this.destroyed = true;
                 }
@@ -346,7 +439,6 @@
                 ctx.translate(sx, this.y);
                 ctx.rotate(this.angle);
 
-                // Simple enemy plane
                 drawLine(-size, 0, size, 0, '#f00');
                 drawLine(-size*0.8, -size*0.6, size*0.8, -size*0.6, '#f00');
                 drawLine(0, 0, 0, -size*0.6, '#f00');
@@ -359,6 +451,126 @@
                 const dx = obj.x - this.x;
                 const dy = obj.y - this.y;
                 return Math.sqrt(dx*dx + dy*dy) < 20;
+            }
+        }
+
+        // Zeppelin class
+        class Zeppelin {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = -0.5;
+                this.health = 5;
+                this.destroyed = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += Math.sin(Date.now() / 1000 + this.x / 200) * 0.3;
+
+                if (this.x < worldOffset - 200) {
+                    this.destroyed = true;
+                }
+            }
+
+            draw() {
+                if (this.destroyed) return;
+
+                const sx = this.x - worldOffset;
+                const width = 60;
+                const height = 20;
+
+                // Balloon
+                ctx.save();
+                ctx.translate(sx, this.y);
+
+                drawLine(-width/2, 0, width/2, 0, '#f80', 3);
+                drawLine(-width/2, -height/2, width/2, -height/2, '#f80', 2);
+                drawLine(-width/2, height/2, width/2, height/2, '#f80', 2);
+                drawLine(-width/2, -height/2, -width/2, height/2, '#f80', 2);
+                drawLine(width/2, -height/2, width/2, height/2, '#f80', 2);
+
+                // Gondola
+                drawLine(-10, height/2, -10, height/2 + 10, '#f80');
+                drawLine(10, height/2, 10, height/2 + 10, '#f80');
+                drawLine(-10, height/2 + 10, 10, height/2 + 10, '#f80');
+
+                ctx.restore();
+            }
+
+            checkCollision(obj) {
+                if (this.destroyed) return false;
+                const dx = obj.x - this.x;
+                const dy = obj.y - this.y;
+                return Math.sqrt(dx*dx + dy*dy) < 40;
+            }
+
+            hit() {
+                this.health--;
+                if (this.health <= 0) {
+                    this.destroyed = true;
+                    explosions.push(new Explosion(this.x, this.y));
+                    explosions.push(new Explosion(this.x - 20, this.y - 10));
+                    explosions.push(new Explosion(this.x + 20, this.y + 10));
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // AA Gun class
+        class AAGun {
+            constructor(x) {
+                this.x = x;
+                this.destroyed = false;
+                this.fireTimer = 0;
+                this.barrelAngle = -Math.PI / 4;
+            }
+
+            update() {
+                if (this.destroyed) return;
+
+                // Track player
+                const dx = (player.x + worldOffset) - this.x;
+                const dy = player.y - (GROUND_LEVEL - 15);
+                this.barrelAngle = Math.atan2(dy, dx);
+
+                // Fire at player
+                this.fireTimer--;
+                if (this.fireTimer <= 0 && Math.abs(dx) < 400) {
+                    const fireRate = settings.difficulty === 'hard' ? 100 : 150;
+                    this.fireTimer = fireRate + Math.random() * 100;
+
+                    const bulletSpeed = 6;
+                    const vx = Math.cos(this.barrelAngle) * bulletSpeed;
+                    const vy = Math.sin(this.barrelAngle) * bulletSpeed;
+                    enemyBullets.push(new Bullet(this.x, GROUND_LEVEL - 15, vx, vy));
+                }
+            }
+
+            draw() {
+                if (this.destroyed) return;
+
+                const sx = this.x - worldOffset;
+                const y = GROUND_LEVEL;
+
+                // Base
+                drawLine(sx - 10, y, sx + 10, y, '#f00', 3);
+                drawLine(sx - 8, y, sx - 8, y - 8, '#f00', 2);
+                drawLine(sx + 8, y, sx + 8, y - 8, '#f00', 2);
+
+                // Barrel
+                const barrelLength = 20;
+                const ex = sx + Math.cos(this.barrelAngle) * barrelLength;
+                const ey = y - 8 + Math.sin(this.barrelAngle) * barrelLength;
+                drawLine(sx, y - 8, ex, ey, '#f00', 2);
+            }
+
+            checkCollision(obj) {
+                if (this.destroyed) return false;
+                const dx = obj.x - this.x;
+                const dy = obj.y - GROUND_LEVEL;
+                return Math.sqrt(dx*dx + dy*dy) < 15;
             }
         }
 
@@ -401,38 +613,102 @@
         }
 
         // Game objects
-        let player = new Plane(200, 200);
+        let player = new Plane(100, GROUND_LEVEL - 10, true);
         let bullets = [];
+        let enemyBullets = [];
         let bombs = [];
         let buildings = [];
         let enemies = [];
+        let zeppelins = [];
+        let aaGuns = [];
         let explosions = [];
 
         // Generate initial world
         function generateWorld() {
             buildings = [];
-            let x = 200;
-            for (let i = 0; i < 20; i++) {
+            aaGuns = [];
+
+            // Airfield at start (clear area)
+            let x = 500;
+
+            for (let i = 0; i < 30; i++) {
                 const width = 40 + Math.random() * 60;
-                const height = 40 + Math.random() * 100;
+                const height = 40 + Math.random() * 120;
                 buildings.push(new Building(x, width, height));
-                x += width + 50 + Math.random() * 200;
+
+                // Spawn AA guns on some buildings
+                if (Math.random() < 0.15 && settings.difficulty !== 'easy') {
+                    aaGuns.push(new AAGun(x + width / 2));
+                }
+
+                x += width + 80 + Math.random() * 200;
             }
         }
 
-        generateWorld();
+        // Weather system
+        function updateWeather() {
+            if (settings.weather === 'windy') {
+                windEffect = Math.sin(Date.now() / 2000) * 2;
+                settings.windStrength = windEffect;
+            } else if (settings.weather === 'stormy') {
+                windEffect = Math.sin(Date.now() / 1500) * 3 + Math.random() - 0.5;
+                settings.windStrength = windEffect;
+
+                // Rain drops
+                if (Math.random() < 0.3) {
+                    rainDrops.push({
+                        x: Math.random() * canvas.width,
+                        y: 0,
+                        vy: 5 + Math.random() * 5,
+                        life: 100
+                    });
+                }
+            } else {
+                windEffect = 0;
+                settings.windStrength = 0;
+            }
+
+            // Update rain
+            rainDrops = rainDrops.filter(drop => {
+                drop.y += drop.vy;
+                drop.x += windEffect * 0.5;
+                drop.life--;
+                return drop.y < canvas.height && drop.life > 0;
+            });
+        }
+
+        function drawWeather() {
+            if (settings.weather === 'stormy') {
+                rainDrops.forEach(drop => {
+                    drawLine(drop.x, drop.y, drop.x + windEffect, drop.y + 10,
+                            'rgba(100, 150, 255, 0.3)', 1);
+                });
+            }
+        }
 
         // Spawn enemies
-        function spawnEnemy() {
-            if (gameState === 'playing' && Math.random() < 0.01) {
+        function spawnEnemies() {
+            if (gameState !== 'playing') return;
+
+            const spawnRate = settings.difficulty === 'easy' ? 0.005 :
+                             settings.difficulty === 'normal' ? 0.01 : 0.02;
+
+            // Enemy planes
+            if (Math.random() < spawnRate) {
                 const y = 100 + Math.random() * 200;
                 enemies.push(new Enemy(worldOffset + canvas.width + 100, y));
+            }
+
+            // Zeppelins (rare)
+            if (Math.random() < spawnRate * 0.2) {
+                const y = 80 + Math.random() * 150;
+                zeppelins.push(new Zeppelin(worldOffset + canvas.width + 100, y));
             }
         }
 
         // Fire bullet
         function fireBullet() {
-            const bulletSpeed = 10;
+            const bulletSpeed = 12;
             const vx = player.vx + Math.cos(player.angle) * bulletSpeed;
             const vy = player.vy + Math.sin(player.angle) * bulletSpeed;
             const x = player.x + worldOffset + Math.cos(player.angle) * 25;
@@ -447,29 +723,85 @@
             bombs.push(new Bomb(x, y, player.vx));
         }
 
+        // High score management
+        function saveHighScore() {
+            if (highScores.length < 10 || score > highScores[highScores.length - 1].score) {
+                const name = playerName.join('');
+                highScores.push({ name, score });
+                highScores.sort((a, b) => b.score - a.score);
+                highScores = highScores.slice(0, 10);
+                localStorage.setItem('sopwithHighScores', JSON.stringify(highScores));
+            }
+        }
+
+        function displayHighScores() {
+            let html = '<b>HIGH SCORES</b><br>';
+            highScores.forEach((hs, i) => {
+                html += `${i + 1}. ${hs.name} - ${hs.score}<br>`;
+            });
+            highscoresDiv.innerHTML = html;
+        }
+
         // Main game loop
         function gameLoop() {
-            // Clear screen
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             if (gameState === 'start') {
-                drawText('SOPWITH', canvas.width / 2 - 80, canvas.height / 2 - 50, 32);
-                drawText('Vector Edition', canvas.width / 2 - 100, canvas.height / 2, 20);
-                drawText('Press SPACE to Start', canvas.width / 2 - 140, canvas.height / 2 + 50, 20);
+                drawText('SOPWITH', canvas.width / 2 - 80, canvas.height / 2 - 80, 32);
+                drawText('Vector Edition', canvas.width / 2 - 100, canvas.height / 2 - 40, 20);
+                drawText('Press SPACE to Start', canvas.width / 2 - 140, canvas.height / 2 + 10, 20);
+                drawText('Press T for Settings', canvas.width / 2 - 130, canvas.height / 2 + 40, 16);
+
+                displayHighScores();
 
                 if (keys[' ']) {
                     gameState = 'playing';
-                    player = new Plane(200, 200);
+                    player = new Plane(100, GROUND_LEVEL - 10, true);
                     bullets = [];
+                    enemyBullets = [];
                     bombs = [];
                     explosions = [];
                     enemies = [];
+                    zeppelins = [];
                     worldOffset = 0;
                     score = 0;
+                    rainDrops = [];
                     generateWorld();
                 }
+
+                if (keys['t'] || keys['T']) {
+                    gameState = 'settings';
+                    keys['t'] = false;
+                    keys['T'] = false;
+                }
+
+            } else if (gameState === 'settings') {
+                drawText('SETTINGS', canvas.width / 2 - 70, 100, 28);
+
+                drawText('DIFFICULTY:', 300, 200, 18);
+                drawText(settings.difficulty === 'easy' ? '> EASY <' : '  EASY', 300, 230, 16,
+                        settings.difficulty === 'easy' ? '#ff0' : '#0f0');
+                drawText(settings.difficulty === 'normal' ? '> NORMAL <' : '  NORMAL', 300, 255, 16,
+                        settings.difficulty === 'normal' ? '#ff0' : '#0f0');
+                drawText(settings.difficulty === 'hard' ? '> HARD <' : '  HARD', 300, 280, 16,
+                        settings.difficulty === 'hard' ? '#ff0' : '#0f0');
+
+                drawText('WEATHER:', 600, 200, 18);
+                drawText(settings.weather === 'clear' ? '> CLEAR <' : '  CLEAR', 600, 230, 16,
+                        settings.weather === 'clear' ? '#ff0' : '#0f0');
+                drawText(settings.weather === 'windy' ? '> WINDY <' : '  WINDY', 600, 255, 16,
+                        settings.weather === 'windy' ? '#ff0' : '#0f0');
+                drawText(settings.weather === 'stormy' ? '> STORMY <' : '  STORMY', 600, 280, 16,
+                        settings.weather === 'stormy' ? '#ff0' : '#0f0');
+
+                drawText('1-3: Set Difficulty | 4-6: Set Weather | ESC: Back',
+                        canvas.width / 2 - 280, canvas.height - 100, 16);
+
             } else if (gameState === 'playing') {
+                // Update weather
+                updateWeather();
+
                 // Update world scroll
                 worldOffset += player.vx;
 
@@ -477,7 +809,10 @@
                 player.update();
 
                 // Spawn enemies
-                spawnEnemy();
+                spawnEnemies();
+
+                // Update AA guns
+                aaGuns.forEach(gun => gun.update());
 
                 // Update bullets
                 bullets = bullets.filter(b => {
@@ -491,6 +826,46 @@
                             score += 100;
                             return false;
                         }
+                    }
+
+                    // Check zeppelin hits
+                    for (let zep of zeppelins) {
+                        if (zep.checkCollision(b)) {
+                            if (zep.hit()) {
+                                score += 500;
+                            }
+                            return false;
+                        }
+                    }
+
+                    // Check AA gun hits
+                    for (let gun of aaGuns) {
+                        if (gun.checkCollision(b)) {
+                            gun.destroyed = true;
+                            explosions.push(new Explosion(gun.x, GROUND_LEVEL - 10));
+                            score += 200;
+                            return false;
+                        }
+                    }
+
+                    return b.life > 0 && b.y < canvas.height && b.x > worldOffset - 100;
+                });
+
+                // Update enemy bullets
+                enemyBullets = enemyBullets.filter(b => {
+                    b.update();
+
+                    // Check player hit
+                    const dx = b.x - (player.x + worldOffset);
+                    const dy = b.y - player.y;
+                    if (Math.sqrt(dx*dx + dy*dy) < 15) {
+                        player.health -= 10;
+                        explosions.push(new Explosion(player.x + worldOffset, player.y));
+                        if (player.health <= 0) {
+                            player.crashed = true;
+                            gameState = 'gameover';
+                        }
+                        return false;
                     }
 
                     return b.life > 0 && b.y < canvas.height;
@@ -510,7 +885,16 @@
                         }
                     }
 
-                    // Check ground hit
+                    // Check AA gun hits
+                    for (let gun of aaGuns) {
+                        if (gun.checkCollision(b)) {
+                            gun.destroyed = true;
+                            explosions.push(new Explosion(gun.x, GROUND_LEVEL - 10));
+                            score += 200;
+                            return false;
+                        }
+                    }
+
                     if (b.y >= GROUND_LEVEL) {
                         explosions.push(new Explosion(b.x, GROUND_LEVEL));
                         return false;
@@ -523,14 +907,26 @@
                 enemies = enemies.filter(e => {
                     e.update();
 
-                    // Check player collision
-                    if (e.checkCollision(player)) {
+                    if (e.checkCollision({x: player.x + worldOffset, y: player.y})) {
                         player.crashed = true;
                         explosions.push(new Explosion(player.x + worldOffset, player.y));
                         gameState = 'gameover';
                     }
 
                     return !e.destroyed;
+                });
+
+                // Update zeppelins
+                zeppelins = zeppelins.filter(z => {
+                    z.update();
+
+                    if (z.checkCollision({x: player.x + worldOffset, y: player.y})) {
+                        player.crashed = true;
+                        explosions.push(new Explosion(player.x + worldOffset, player.y));
+                        gameState = 'gameover';
+                    }
+
+                    return !z.destroyed;
                 });
 
                 // Update explosions
@@ -541,7 +937,8 @@
 
                 // Check building collisions with player
                 for (let building of buildings) {
-                    if (building.checkCollision({x: player.x + worldOffset, y: player.y})) {
+                    if (!building.destroyed &&
+                        building.checkCollision({x: player.x + worldOffset, y: player.y})) {
                         player.crashed = true;
                         explosions.push(new Explosion(player.x + worldOffset, player.y));
                         gameState = 'gameover';
@@ -551,7 +948,14 @@
                 // Draw ground
                 drawLine(0, GROUND_LEVEL, canvas.width, GROUND_LEVEL, '#0f0');
 
-                // Draw horizon/sky
+                // Draw airfield at start
+                const airfieldX = -worldOffset;
+                if (airfieldX > -200 && airfieldX < canvas.width) {
+                    drawLine(airfieldX, GROUND_LEVEL, airfieldX + 400, GROUND_LEVEL, '#ff0', 3);
+                    drawText('AIRFIELD', airfieldX + 150, GROUND_LEVEL + 20, 14, '#ff0');
+                }
+
+                // Draw horizon
                 for (let i = 0; i < 5; i++) {
                     const y = 50 + i * 30;
                     const offset = (worldOffset * (0.2 + i * 0.1)) % 100;
@@ -560,14 +964,24 @@
                     }
                 }
 
+                // Draw weather
+                drawWeather();
+
                 // Draw buildings
                 buildings.forEach(b => b.draw());
+
+                // Draw AA guns
+                aaGuns.forEach(g => g.draw());
 
                 // Draw enemies
                 enemies.forEach(e => e.draw());
 
+                // Draw zeppelins
+                zeppelins.forEach(z => z.draw());
+
                 // Draw bullets
                 bullets.forEach(b => b.draw());
+                enemyBullets.forEach(b => b.draw());
 
                 // Draw bombs
                 bombs.forEach(b => b.draw());
@@ -579,18 +993,29 @@
                 player.draw();
 
                 // Draw HUD
+                const throttleBar = '|'.repeat(Math.floor(player.throttle * 10));
+                const fuelBar = '|'.repeat(Math.floor(player.fuel / 10));
+                const healthBar = '|'.repeat(Math.floor(player.health / 10));
+
                 info.innerHTML = `
                     SCORE: ${score}<br>
-                    ALTITUDE: ${Math.floor(GROUND_LEVEL - player.y)}<br>
-                    SPEED: ${Math.floor(player.vx)}<br>
-                    FUEL: ${Math.floor(player.fuel)}%
+                    ALTITUDE: ${Math.floor(GROUND_LEVEL - player.y)}ft<br>
+                    SPEED: ${Math.floor(Math.sqrt(player.vx * player.vx + player.vy * player.vy) * 10)}kts<br>
+                    THROTTLE: ${throttleBar}<br>
+                    FUEL: ${fuelBar}<br>
+                    HEALTH: ${healthBar}<br>
+                    ${settings.weather !== 'clear' ? 'WIND: ' + windEffect.toFixed(1) : ''}
                 `;
+
+                displayHighScores();
 
             } else if (gameState === 'gameover') {
                 // Continue drawing game state
                 drawLine(0, GROUND_LEVEL, canvas.width, GROUND_LEVEL, '#0f0');
                 buildings.forEach(b => b.draw());
+                aaGuns.forEach(g => g.draw());
                 enemies.forEach(e => e.draw());
+                zeppelins.forEach(z => z.draw());
                 bullets.forEach(b => b.draw());
                 bombs.forEach(b => b.draw());
                 explosions.forEach(e => {
@@ -599,15 +1024,32 @@
                 });
                 player.draw();
 
-                // Game over message
-                drawText('CRASHED!', canvas.width / 2 - 80, canvas.height / 2 - 30, 32, '#f00');
-                drawText(`Final Score: ${score}`, canvas.width / 2 - 100, canvas.height / 2 + 20, 20);
-                drawText('Press R to Restart', canvas.width / 2 - 120, canvas.height / 2 + 60, 20);
+                drawText('CRASHED!', canvas.width / 2 - 80, canvas.height / 2 - 50, 32, '#f00');
+                drawText(`Final Score: ${score}`, canvas.width / 2 - 100, canvas.height / 2, 20);
 
-                info.innerHTML = `
-                    SCORE: ${score}<br>
-                    CRASHED!
-                `;
+                // Check if high score
+                const isHighScore = highScores.length < 10 || score > highScores[highScores.length - 1]?.score || 0;
+                if (isHighScore) {
+                    drawText('NEW HIGH SCORE!', canvas.width / 2 - 120, canvas.height / 2 + 30, 18, '#ff0');
+                    drawText('Press N to Enter Name', canvas.width / 2 - 140, canvas.height / 2 + 60, 16);
+                }
+
+                drawText('Press R to Restart', canvas.width / 2 - 120, canvas.height / 2 + 90, 16);
+
+                info.innerHTML = `SCORE: ${score}<br>CRASHED!`;
+                displayHighScores();
+
+            } else if (gameState === 'nameentry') {
+                drawText('ENTER YOUR NAME', canvas.width / 2 - 150, 200, 24);
+                drawText('Use Arrow Keys, Press ENTER when done', canvas.width / 2 - 240, 240, 14);
+
+                const name = playerName.join('');
+                for (let i = 0; i < 3; i++) {
+                    const color = i === nameIndex ? '#ff0' : '#0f0';
+                    drawText(playerName[i], canvas.width / 2 - 30 + i * 30, 300, 32, color);
+                }
+
+                drawText(`Score: ${score}`, canvas.width / 2 - 60, 360, 20);
             }
 
             requestAnimationFrame(gameLoop);
@@ -621,7 +1063,7 @@
             keys[e.key] = true;
 
             if (gameState === 'playing') {
-                if (e.key === ' ' && Date.now() - lastFire > 200) {
+                if (e.key === ' ' && Date.now() - lastFire > 150) {
                     fireBullet();
                     lastFire = Date.now();
                     e.preventDefault();
@@ -634,8 +1076,55 @@
                 }
             }
 
-            if (e.key.toLowerCase() === 'r' && gameState === 'gameover') {
-                gameState = 'start';
+            if (gameState === 'settings') {
+                if (e.key === '1') settings.difficulty = 'easy';
+                if (e.key === '2') settings.difficulty = 'normal';
+                if (e.key === '3') settings.difficulty = 'hard';
+                if (e.key === '4') settings.weather = 'clear';
+                if (e.key === '5') settings.weather = 'windy';
+                if (e.key === '6') settings.weather = 'stormy';
+                if (e.key === 'Escape') gameState = 'start';
+            }
+
+            if (gameState === 'gameover') {
+                if (e.key.toLowerCase() === 'r') {
+                    gameState = 'start';
+                }
+                if (e.key.toLowerCase() === 'n') {
+                    const isHighScore = highScores.length < 10 ||
+                                       score > highScores[highScores.length - 1]?.score || 0;
+                    if (isHighScore) {
+                        gameState = 'nameentry';
+                        playerName = ['A', 'A', 'A'];
+                        nameIndex = 0;
+                    }
+                }
+            }
+
+            if (gameState === 'nameentry') {
+                if (e.key === 'ArrowLeft') {
+                    nameIndex = Math.max(0, nameIndex - 1);
+                }
+                if (e.key === 'ArrowRight') {
+                    nameIndex = Math.min(2, nameIndex + 1);
+                }
+                if (e.key === 'ArrowUp') {
+                    let code = playerName[nameIndex].charCodeAt(0);
+                    code++;
+                    if (code > 90) code = 65;
+                    playerName[nameIndex] = String.fromCharCode(code);
+                }
+                if (e.key === 'ArrowDown') {
+                    let code = playerName[nameIndex].charCodeAt(0);
+                    code--;
+                    if (code < 65) code = 90;
+                    playerName[nameIndex] = String.fromCharCode(code);
+                }
+                if (e.key === 'Enter') {
+                    saveHighScore();
+                    gameState = 'start';
+                }
+                e.preventDefault();
             }
         });
 
@@ -644,6 +1133,7 @@
         });
 
         // Start game loop
+        displayHighScores();
         gameLoop();
     </script>
 </body>

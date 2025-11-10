@@ -1,0 +1,26 @@
+# Python dependencies for Kinect Gen 1 projects
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+numpy>=1.19.0
+opencv-python>=4.5.0
+
+# Kinect driver
+freenect>=0.2.0
+
+# 3D scanning and point clouds
+open3d>=0.13.0
+
+# Gesture control and input
+pynput>=1.7.0
+
+# Visualization and plotting
+matplotlib>=3.3.0
+
+# Optional: Advanced computer vision
+scikit-image>=0.18.0
+scikit-learn>=0.24.0
+
+# Optional: For machine learning gesture recognition
+# tensorflow>=2.5.0
+# pytorch>=1.9.0

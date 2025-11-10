@@ -472,85 +472,101 @@
     </div>
 
     <script>
-        let currentChannelId = 1; // Default to #general
-        let currentChannelName = 'general';
-        let lastMessageId = 0;
-        let channels = [];
-        let isAdmin = false;
+        var currentChannelId = 1;
+        var currentChannelName = 'general';
+        var lastMessageId = 0;
+        var channels = [];
+        var isAdmin = false;
 
-        // Check if user is admin
-        async function checkAdmin() {
-            try {
-                const response = await fetch('/api/admin/check');
-                const data = await response.json();
-                isAdmin = data.is_admin;
-
-                if (isAdmin) {
-                    document.getElementById('adminBtn').style.display = 'block';
-                    document.getElementById('addChannelBtn').classList.add('show');
+        function checkAdmin() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/admin/check', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        isAdmin = data.is_admin;
+                        if (isAdmin) {
+                            document.getElementById('adminBtn').style.display = 'block';
+                            var btn = document.getElementById('addChannelBtn');
+                            btn.className = btn.className + ' show';
+                        }
+                    } catch (e) {
+                        console.error('Error checking admin status:', e);
+                    }
                 }
-            } catch (error) {
-                console.error('Error checking admin status:', error);
-            }
+            };
+            xhr.send();
         }
 
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('hidden');
+            var sidebar = document.getElementById('sidebar');
+            if (sidebar.className.indexOf('hidden') >= 0) {
+                sidebar.className = sidebar.className.replace(' hidden', '').replace('hidden', '');
+            } else {
+                sidebar.className = sidebar.className + ' hidden';
+            }
         }
 
         function showAddChannelModal() {
-            document.getElementById('addChannelModal').classList.add('show');
+            var modal = document.getElementById('addChannelModal');
+            modal.className = modal.className + ' show';
             document.getElementById('newChannelName').focus();
         }
 
         function hideAddChannelModal() {
-            document.getElementById('addChannelModal').classList.remove('show');
+            var modal = document.getElementById('addChannelModal');
+            modal.className = modal.className.replace(' show', '').replace('show', '');
             document.getElementById('newChannelName').value = '';
         }
 
-        async function createChannel() {
-            const name = document.getElementById('newChannelName').value.trim();
+        function createChannel() {
+            var name = document.getElementById('newChannelName').value.replace(/^\s+|\s+$/g, '');
             if (!name) return;
 
-            try {
-                const response = await fetch('/api/channels', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, display_name: '#' + name })
-                });
-
-                if (response.ok) {
-                    hideAddChannelModal();
-                    loadChannels();
-                } else {
-                    const data = await response.json();
-                    alert(data.error || 'Failed to create channel');
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/channels', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200 || xhr.status === 201) {
+                        hideAddChannelModal();
+                        loadChannels();
+                    } else {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            alert(data.error || 'Failed to create channel');
+                        } catch (e) {
+                            alert('Failed to create channel');
+                        }
+                    }
                 }
-            } catch (error) {
-                console.error('Error creating channel:', error);
-                alert('Failed to create channel');
-            }
+            };
+            xhr.send(JSON.stringify({ name: name, display_name: '#' + name }));
         }
 
-        async function loadChannels() {
-            try {
-                const response = await fetch('/api/channels');
-                channels = await response.json();
-
-                const channelsList = document.getElementById('channelsList');
-                channelsList.innerHTML = channels.map(ch => `
-                    <div class="channel-item ${ch.id === currentChannelId ? 'active' : ''}"
-                         onclick="switchChannel(${ch.id}, '${ch.name}', '${ch.display_name}')">
-                        ${ch.display_name}
-                    </div>
-                `).join('');
-
-                // Show gallery button if in pictures channel
-                updateGalleryButton();
-            } catch (error) {
-                console.error('Error loading channels:', error);
-            }
+        function loadChannels() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/channels', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    try {
+                        channels = JSON.parse(xhr.responseText);
+                        var channelsList = document.getElementById('channelsList');
+                        var html = '';
+                        for (var i = 0; i < channels.length; i++) {
+                            var ch = channels[i];
+                            var activeClass = ch.id === currentChannelId ? 'active' : '';
+                            html += '<div class="channel-item ' + activeClass + '" onclick="switchChannel(' + ch.id + ', \'' + ch.name + '\', \'' + ch.display_name + '\')">' + ch.display_name + '</div>';
+                        }
+                        channelsList.innerHTML = html;
+                        updateGalleryButton();
+                    } catch (e) {
+                        console.error('Error loading channels:', e);
+                    }
+                }
+            };
+            xhr.send();
         }
 
         function switchChannel(channelId, name, displayName) {
@@ -561,15 +577,19 @@
             document.getElementById('currentChannel').textContent = displayName;
             document.getElementById('messages').innerHTML = '<div class="empty-state">Loading...</div>';
 
-            // Update active channel in sidebar
-            document.querySelectorAll('.channel-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            event.target.classList.add('active');
+            var items = document.querySelectorAll('.channel-item');
+            for (var i = 0; i < items.length; i++) {
+                items[i].className = items[i].className.replace(' active', '').replace('active', '');
+            }
+            if (event && event.target) {
+                event.target.className = event.target.className + ' active';
+            }
 
-            // Hide sidebar on mobile after selecting channel
             if (window.innerWidth <= 768) {
-                document.getElementById('sidebar').classList.add('hidden');
+                var sidebar = document.getElementById('sidebar');
+                if (sidebar.className.indexOf('hidden') < 0) {
+                    sidebar.className = sidebar.className + ' hidden';
+                }
             }
 
             updateGalleryButton();
@@ -577,7 +597,7 @@
         }
 
         function updateGalleryButton() {
-            const galleryBtn = document.getElementById('galleryBtn');
+            var galleryBtn = document.getElementById('galleryBtn');
             if (currentChannelName === 'pictures') {
                 galleryBtn.style.display = 'block';
             } else {
@@ -586,155 +606,152 @@
         }
 
         function openGallery() {
-            window.location.href = `/gallery/${currentChannelId}`;
+            window.location.href = '/gallery/' + currentChannelId;
         }
 
         function formatTimestamp(timestamp) {
-            const date = new Date(timestamp);
+            var date = new Date(timestamp);
             return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         }
 
         function renderMessage(msg) {
-            let content = '';
+            var content = '';
 
             if (msg.message_type === 'image') {
                 if (msg.loaded && msg.image) {
-                    content = `
-                        <div class="message-image">
-                            <img src="/uploads/thumbnails/${msg.image.thumbnail_filename}"
-                                 onclick="window.open('/uploads/${msg.image.filename}', '_blank')"
-                                 alt="Image">
-                        </div>
-                    `;
+                    content = '<div class="message-image"><img src="/uploads/thumbnails/' +
+                        msg.image.thumbnail_filename + '" onclick="window.open(\'/uploads/' +
+                        msg.image.filename + '\', \'_blank\')" alt="Image"></div>';
                 } else {
                     content = '<em>Image not loaded (older than 100MB limit)</em>';
                 }
             } else if (msg.message_type === 'youtube' && msg.metadata) {
-                const videoId = msg.metadata.video_id;
-                content = `
-                    <div class="message-content">${escapeHtml(msg.content)}</div>
-                    <div class="youtube-preview">
-                        <iframe src="https://www.youtube.com/embed/${videoId}"
-                                allowfullscreen></iframe>
-                    </div>
-                `;
+                var videoId = msg.metadata.video_id;
+                content = '<div class="message-content">' + escapeHtml(msg.content) +
+                    '</div><div class="youtube-preview"><iframe src="https://www.youtube.com/embed/' +
+                    videoId + '" allowfullscreen></iframe></div>';
             } else if (msg.message_type === 'link') {
-                content = `<div class="message-content"><a href="${escapeHtml(msg.content)}" target="_blank" class="link-preview">${escapeHtml(msg.content)}</a></div>`;
+                content = '<div class="message-content"><a href="' + escapeHtml(msg.content) +
+                    '" target="_blank" class="link-preview">' + escapeHtml(msg.content) + '</a></div>';
             } else {
-                content = `<div class="message-content">${escapeHtml(msg.content)}</div>`;
+                content = '<div class="message-content">' + escapeHtml(msg.content) + '</div>';
             }
 
-            return `
-                <div class="message">
-                    <div class="message-header">
-                        <span class="username">${escapeHtml(msg.username)}</span>
-                        <span class="timestamp">${formatTimestamp(msg.timestamp)}</span>
-                    </div>
-                    ${content}
-                </div>
-            `;
+            return '<div class="message"><div class="message-header"><span class="username">' +
+                escapeHtml(msg.username) + '</span><span class="timestamp">' +
+                formatTimestamp(msg.timestamp) + '</span></div>' + content + '</div>';
         }
 
         function escapeHtml(text) {
-            const div = document.createElement('div');
+            var div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
 
-        async function loadMessages() {
-            try {
-                const response = await fetch(`/api/messages/${currentChannelId}`);
-                const data = await response.json();
-                const messages = data.messages || [];
+        function loadMessages() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/messages/' + currentChannelId, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        var messages = data.messages || [];
+                        var messagesDiv = document.getElementById('messages');
 
-                const messagesDiv = document.getElementById('messages');
+                        if (messages.length === 0) {
+                            messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+                            return;
+                        }
 
-                if (messages.length === 0) {
-                    messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
-                    return;
-                }
+                        var newMessages = [];
+                        for (var i = 0; i < messages.length; i++) {
+                            if (messages[i].id > lastMessageId) {
+                                newMessages.push(messages[i]);
+                            }
+                        }
 
-                // Only update if there are new messages
-                const newMessages = messages.filter(msg => msg.id > lastMessageId);
+                        if (newMessages.length > 0) {
+                            if (lastMessageId === 0) {
+                                var html = '';
+                                for (var i = 0; i < messages.length; i++) {
+                                    html += renderMessage(messages[i]);
+                                }
+                                messagesDiv.innerHTML = html;
+                            } else {
+                                var html = '';
+                                for (var i = 0; i < newMessages.length; i++) {
+                                    html += renderMessage(newMessages[i]);
+                                }
+                                messagesDiv.innerHTML += html;
+                            }
 
-                if (newMessages.length > 0) {
-                    if (lastMessageId === 0) {
-                        // First load - render all messages
-                        messagesDiv.innerHTML = messages.map(renderMessage).join('');
-                    } else {
-                        // Append only new messages
-                        messagesDiv.innerHTML += newMessages.map(renderMessage).join('');
+                            lastMessageId = messages[messages.length - 1].id;
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        }
+                    } catch (e) {
+                        console.error('Error loading messages:', e);
                     }
-
-                    lastMessageId = messages[messages.length - 1].id;
-
-                    // Scroll to bottom
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 }
-            } catch (error) {
-                console.error('Error loading messages:', error);
-            }
+            };
+            xhr.send();
         }
 
-        async function sendMessage() {
-            const messageInput = document.getElementById('messageInput');
-            const message = messageInput.value.trim();
+        function sendMessage() {
+            var messageInput = document.getElementById('messageInput');
+            var message = messageInput.value.replace(/^\s+|\s+$/g, '');
 
             if (!message) return;
 
-            try {
-                const response = await fetch(`/api/messages/${currentChannelId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ message })
-                });
-
-                if (response.ok) {
-                    messageInput.value = '';
-                    messageInput.style.height = 'auto';
-                    loadMessages();
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/messages/' + currentChannelId, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200 || xhr.status === 201) {
+                        messageInput.value = '';
+                        messageInput.style.height = 'auto';
+                        loadMessages();
+                    } else {
+                        alert('Failed to send message');
+                    }
                 }
-            } catch (error) {
-                console.error('Error sending message:', error);
-                alert('Failed to send message');
-            }
+            };
+            xhr.send(JSON.stringify({ message: message }));
         }
 
-        async function uploadImage() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
+        function uploadImage() {
+            var fileInput = document.getElementById('fileInput');
+            var file = fileInput.files[0];
 
             if (!file) return;
 
-            // Check file size (10MB limit)
             if (file.size > 10 * 1024 * 1024) {
                 alert('File too large. Maximum size is 10MB.');
                 fileInput.value = '';
                 return;
             }
 
-            const formData = new FormData();
+            var formData = new FormData();
             formData.append('file', file);
 
-            try {
-                const response = await fetch(`/api/upload/${currentChannelId}`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    fileInput.value = '';
-                    loadMessages();
-                } else {
-                    const data = await response.json();
-                    alert(data.error || 'Failed to upload image');
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload/' + currentChannelId, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200 || xhr.status === 201) {
+                        fileInput.value = '';
+                        loadMessages();
+                    } else {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            alert(data.error || 'Failed to upload image');
+                        } catch (e) {
+                            alert('Failed to upload image');
+                        }
+                    }
                 }
-            } catch (error) {
-                console.error('Error uploading image:', error);
-                alert('Failed to upload image');
-            }
+            };
+            xhr.send(formData);
         }
 
         function handleKeyPress(event) {
@@ -748,19 +765,17 @@
             window.location.href = '/logout';
         }
 
-        // Auto-resize textarea
-        const textarea = document.getElementById('messageInput');
+        var textarea = document.getElementById('messageInput');
         textarea.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 150) + 'px';
         });
 
-        // Initialize on mobile - hide sidebar by default
         if (window.innerWidth <= 768) {
-            document.getElementById('sidebar').classList.add('hidden');
+            var sidebar = document.getElementById('sidebar');
+            sidebar.className = sidebar.className + ' hidden';
         }
 
-        // Initialize
         checkAdmin();
         loadChannels();
         loadMessages();

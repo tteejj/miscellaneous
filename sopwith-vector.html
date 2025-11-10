@@ -175,12 +175,12 @@
 
                 if (this.onGround) {
                     // GROUND MECHANICS
-                    // Very strong ground acceleration
-                    const groundAccel = this.throttle * 1.5;
+                    // MASSIVE ground acceleration - like original Sopwith
+                    const groundAccel = this.throttle * 3.0;
                     this.vx += groundAccel;
 
-                    // Minimal friction on ground
-                    this.vx *= 0.95;
+                    // Almost no friction - builds speed fast
+                    this.vx *= 0.98;
 
                     // No vertical velocity on ground
                     this.vy = 0;
@@ -190,10 +190,10 @@
                     // Minimal fuel consumption on ground (taxiing)
                     this.fuel = Math.max(0, this.fuel - 0.005 * this.throttle);
 
-                    // Natural takeoff when fast enough with pitch up - LOWER threshold
-                    if (this.vx > 3.0 && keys['ArrowUp']) {
+                    // Natural takeoff when fast enough with pitch up - very low threshold
+                    if (this.vx > 2.5 && keys['ArrowUp']) {
                         this.onGround = false;
-                        this.vy = -3.0; // Stronger initial lift
+                        this.vy = -4.0; // Strong initial lift like original
                     }
 
                 } else {
@@ -1037,7 +1037,7 @@
                 const fuelBar = '|'.repeat(Math.floor(player.fuel / 10));
                 const healthBar = '|'.repeat(Math.floor(player.health / 10));
                 const statusMsg = player.onGround ?
-                    (player.vx < 3.0 ? 'ON GROUND - Build speed (W)!' : 'ON GROUND - Ready! Pull up!') :
+                    (player.vx < 2.5 ? 'ON GROUND - Accelerate (W)!' : 'ON GROUND - READY! Pull up!') :
                     'AIRBORNE';
 
                 info.innerHTML = `

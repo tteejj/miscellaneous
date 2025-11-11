@@ -1165,8 +1165,9 @@
                 if (isAdmin) {
                     document.getElementById('adminBtn').style.display = 'block';
                 }
-            };
-            xhr.send();
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+            }
         }
 
         async function loadChannels() {
@@ -1573,43 +1574,10 @@
                     const data = await response.json();
                     alert(data.error || 'Failed to send message');
                 }
-            };
-            xhr.send(JSON.stringify({ message: message }));
-        }
-
-        function uploadImage() {
-            var fileInput = document.getElementById('fileInput');
-            var file = fileInput.files[0];
-
-            if (!file) return;
-
-            if (file.size > 10 * 1024 * 1024) {
-                alert('File too large. Maximum size is 10MB.');
-                fileInput.value = '';
-                return;
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert('Failed to send message');
             }
-
-            var formData = new FormData();
-            formData.append('file', file);
-
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/upload/' + currentChannelId, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200 || xhr.status === 201) {
-                        fileInput.value = '';
-                        loadMessages();
-                    } else {
-                        try {
-                            var data = JSON.parse(xhr.responseText);
-                            alert(data.error || 'Failed to upload image');
-                        } catch (e) {
-                            alert('Failed to upload image');
-                        }
-                    }
-                }
-            };
-            xhr.send(formData);
         }
 
         async function deleteMessage(messageId) {

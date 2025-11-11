@@ -333,8 +333,18 @@
     <div class="feedback" id="feedback"></div>
 
     <script>
+        // Test if script is loading
+        console.log('Remote control script loaded');
+
         async function sendCommand(command) {
+            console.log('sendCommand called with:', command);
+
             const feedbackDiv = document.getElementById('feedback');
+            if (!feedbackDiv) {
+                console.error('Feedback div not found!');
+                return;
+            }
+
             feedbackDiv.textContent = command;
             feedbackDiv.classList.add('show');
 
@@ -349,8 +359,10 @@
                     body: JSON.stringify({ command: command })
                 });
 
-                if (!response.ok) {
-                    console.error('Failed to send command');
+                if (response.ok) {
+                    console.log('Command sent successfully:', command);
+                } else {
+                    console.error('Failed to send command, status:', response.status);
                 }
             } catch (error) {
                 console.error('Error sending command:', error);
@@ -379,6 +391,13 @@
                 sendCommand(e.key);
             }
         });
+
+        // Test button click
+        window.testClick = function() {
+            alert('Buttons are clickable!');
+        };
+
+        console.log('Remote control ready. Try clicking a button or check console for errors.');
     </script>
 </body>
 </html>

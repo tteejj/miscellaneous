@@ -137,22 +137,23 @@
 
     <script>
         function showError(message) {
-            const errorMsg = document.getElementById('errorMsg');
+            var errorMsg = document.getElementById('errorMsg');
             errorMsg.textContent = message;
-            errorMsg.classList.add('show');
+            errorMsg.className = errorMsg.className + ' show';
         }
 
         function hideError() {
-            document.getElementById('errorMsg').classList.remove('show');
+            var errorMsg = document.getElementById('errorMsg');
+            errorMsg.className = errorMsg.className.replace(' show', '');
         }
 
-        async function handleSetup(event) {
+        function handleSetup(event) {
             event.preventDefault();
             hideError();
 
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
-            const passwordConfirm = document.getElementById('passwordConfirm').value;
+            var username = document.getElementById('username').value.replace(/^\s+|\s+$/g, '');
+            var password = document.getElementById('password').value;
+            var passwordConfirm = document.getElementById('passwordConfirm').value;
 
             if (!username) {
                 showError('Username is required');
@@ -169,27 +170,31 @@
                 return;
             }
 
-            try {
-                const response = await fetch('/api/setup', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ username, password })
-                });
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/setup', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
 
-                const data = await response.json();
-
-                if (response.ok) {
-                    alert('Setup complete! Redirecting to chat...');
-                    window.location.href = '/';
-                } else {
-                    showError(data.error || 'Setup failed');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        if (xhr.status === 200) {
+                            alert('Setup complete! Redirecting to chat...');
+                            window.location.href = '/';
+                        } else {
+                            showError(data.error || 'Setup failed');
+                        }
+                    } catch (e) {
+                        showError('Setup failed. Please try again.');
+                    }
                 }
-            } catch (error) {
-                console.error('Setup error:', error);
+            };
+
+            xhr.onerror = function() {
                 showError('Setup failed. Please try again.');
-            }
+            };
+
+            xhr.send(JSON.stringify({ username: username, password: password }));
         }
     </script>
 </body>

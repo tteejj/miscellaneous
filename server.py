@@ -33,7 +33,7 @@ os.makedirs(THUMBNAIL_FOLDER, exist_ok=True)
 
 def get_db():
     """Get database connection"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10.0)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -200,30 +200,49 @@ def initial_setup():
     if len(password) < 6:
         return jsonify({'error': 'Password must be at least 6 characters'}), 400
 
-    conn = get_db()
-    cursor = conn.cursor()
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
 
-    # Check if any users exist
-    cursor.execute('SELECT COUNT(*) FROM users')
-    if cursor.fetchone()[0] > 0:
-        conn.close()
-        return jsonify({'error': 'Setup already completed'}), 400
+        # Check if any users exist
+        cursor.execute('SELECT COUNT(*) FROM users')
+        if cursor.fetchone()[0] > 0:
+            return jsonify({'error': 'Setup already completed'}), 400
 
-    # Create first user
-    password_hash = generate_password_hash(password)
-    cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', (username, password_hash))
-    user_id = cursor.lastrowid
+        # Create first user
+        password_hash = generate_password_hash(password)
+        cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', (username, password_hash))
+        user_id = cursor.lastrowid
 
-    # Make them admin
-    cursor.execute('INSERT INTO admins (username) VALUES (?)', (username,))
-    conn.commit()
-    conn.close()
+        # Make them admin (handle case where admin entry already exists)
+        try:
+            cursor.execute('INSERT INTO admins (username) VALUES (?)', (username,))
+        except sqlite3.IntegrityError:
+            # Admin already exists, that's fine
+            pass
 
-    # Log them in
-    session['user_id'] = user_id
-    session['username'] = username
+        conn.commit()
 
-    return jsonify({'success': True, 'message': 'Setup complete'}), 200
+        # Log them in
+        session['user_id'] = user_id
+        session['username'] = username
+
+        return jsonify({'success': True, 'message': 'Setup complete'}), 200
+
+    except sqlite3.IntegrityError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'error': f'Database error: User may already exist'}), 400
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'error': f'Setup failed: {str(e)}'}), 500
+
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/users', methods=['GET'])

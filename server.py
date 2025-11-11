@@ -339,6 +339,36 @@ def profile_page():
     return render_template('profile.html')
 
 
+@app.route('/remote')
+def remote_control():
+    """Samsung TV Remote Control interface"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    return render_template('remote.html')
+
+
+@app.route('/api/remote/command', methods=['POST'])
+def remote_command():
+    """Handle TV remote commands"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    command = data.get('command')
+
+    if not command:
+        return jsonify({'error': 'No command provided'}), 400
+
+    # Log the command (in real implementation, this would send to TV via IR/network)
+    user_info = get_user_info(session['user_id'])
+    app.logger.info(f"TV Remote command from {user_info['username']}: {command}")
+
+    # TODO: Implement actual TV control via Samsung SmartThings API or IR blaster
+    # For now, just acknowledge the command
+    return jsonify({'status': 'success', 'command': command}), 200
+
+
 @app.route('/gallery/<int:channel_id>')
 def gallery():
     """Photo gallery view"""

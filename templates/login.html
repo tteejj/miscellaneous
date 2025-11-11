@@ -46,7 +46,7 @@
             font-weight: 500;
         }
 
-        input[type="text"] {
+        input[type="text"], input[type="password"] {
             width: 100%;
             padding: 0.75rem;
             border: 2px solid #ddd;
@@ -55,7 +55,7 @@
             transition: border-color 0.3s;
         }
 
-        input[type="text"]:focus {
+        input:focus {
             outline: none;
             border-color: #667eea;
         }
@@ -108,15 +108,20 @@
 
         <form method="POST">
             <div class="form-group">
-                <label for="pin">Enter PIN:</label>
-                <input type="tel" id="pin" name="pin" required autofocus maxlength="6" inputmode="numeric" placeholder="000000">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
             </div>
 
             <button type="submit">Login</button>
         </form>
 
         <div class="info">
-            Ask your administrator for the current PIN
+            Contact your administrator for login credentials
         </div>
     </div>
 </body>

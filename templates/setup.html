@@ -55,7 +55,7 @@
             font-weight: 500;
         }
 
-        input[type="text"], input[type="tel"] {
+        input[type="text"], input[type="password"] {
             width: 100%;
             padding: 0.75rem;
             border: 2px solid #ddd;
@@ -110,7 +110,7 @@
         <h1>🔧 Initial Setup</h1>
 
         <div class="info">
-            Welcome! Set up your admin account and PIN to get started.
+            Welcome! Create your admin account to get started. This page is only accessible from localhost for security.
         </div>
 
         <div class="error" id="errorMsg"></div>
@@ -122,13 +122,13 @@
             </div>
 
             <div class="form-group">
-                <label for="pin">Create 6-Digit PIN:</label>
-                <input type="tel" id="pin" required maxlength="6" inputmode="numeric" placeholder="000000">
+                <label for="password">Password:</label>
+                <input type="password" id="password" required minlength="6" placeholder="Min 6 characters">
             </div>
 
             <div class="form-group">
-                <label for="pinConfirm">Confirm PIN:</label>
-                <input type="tel" id="pinConfirm" required maxlength="6" inputmode="numeric" placeholder="000000">
+                <label for="passwordConfirm">Confirm Password:</label>
+                <input type="password" id="passwordConfirm" required minlength="6" placeholder="Re-enter password">
             </div>
 
             <button type="submit">Complete Setup</button>
@@ -151,31 +151,31 @@
             hideError();
 
             const username = document.getElementById('username').value.trim();
-            const pin = document.getElementById('pin').value.trim();
-            const pinConfirm = document.getElementById('pinConfirm').value.trim();
+            const password = document.getElementById('password').value;
+            const passwordConfirm = document.getElementById('passwordConfirm').value;
 
             if (!username) {
                 showError('Username is required');
                 return;
             }
 
-            if (pin.length !== 6 || !/^\d+$/.test(pin)) {
-                showError('PIN must be exactly 6 digits');
+            if (password.length < 6) {
+                showError('Password must be at least 6 characters');
                 return;
             }
 
-            if (pin !== pinConfirm) {
-                showError('PINs do not match');
+            if (password !== passwordConfirm) {
+                showError('Passwords do not match');
                 return;
             }
 
             try {
-                const response = await fetch('/api/admin/set-pin', {
+                const response = await fetch('/api/setup', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ username, pin })
+                    body: JSON.stringify({ username, password })
                 });
 
                 const data = await response.json();

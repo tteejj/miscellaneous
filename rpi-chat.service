@@ -6,10 +6,14 @@ After=network.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/miscellaneous
-Environment="PATH=/home/pi/miscellaneous/venv/bin"
-ExecStart=/home/pi/miscellaneous/venv/bin/python3 /home/pi/miscellaneous/server.py
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/usr/bin/python3 server.py
 Restart=always
 RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

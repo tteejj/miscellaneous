@@ -3,7 +3,7 @@ Flask server for RPi Local Chat Server
 Multi-channel chat with user authentication, image uploads, and link previews
 """
 
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory, Response, stream_with_context
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import sqlite3
@@ -11,9 +11,15 @@ import os
 import re
 import json
 import secrets
-from datetime import datetime
+import time
+import mimetypes
+from datetime import datetime, timedelta
 from PIL import Image
 from database import DB_PATH, init_db
+import markdown
+import bleach
+import queue
+import threading
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
@@ -21,14 +27,24 @@ app.secret_key = secrets.token_hex(32)
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 THUMBNAIL_FOLDER = 'uploads/thumbnails'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+FILES_FOLDER = 'uploads/files'
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+ALLOWED_FILE_EXTENSIONS = {'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'zip', 'mp3', 'mp4', 'wav'}
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB for other files
 THUMBNAIL_SIZE = (800, 800)  # Max dimensions for thumbnails
 IMAGE_LOAD_LIMIT = 100 * 1024 * 1024  # 100MB
+RATE_LIMIT_MESSAGES = 30  # Max messages per minute
+RATE_LIMIT_WINDOW = 60  # seconds
 
 # Create upload directories
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(THUMBNAIL_FOLDER, exist_ok=True)
+os.makedirs(FILES_FOLDER, exist_ok=True)
+
+# SSE message queues for each user
+message_queues = {}
+queue_lock = threading.Lock()
 
 
 def get_db():
@@ -69,9 +85,15 @@ def get_user_info(user_id):
     return dict(user) if user else None
 
 
-def allowed_file(filename):
+def allowed_file(filename, file_type='image'):
     """Check if file extension is allowed"""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    if '.' not in filename:
+        return False
+    ext = filename.rsplit('.', 1)[1].lower()
+    if file_type == 'image':
+        return ext in ALLOWED_IMAGE_EXTENSIONS
+    else:
+        return ext in ALLOWED_FILE_EXTENSIONS
 
 
 def parse_youtube_url(url):
@@ -100,6 +122,140 @@ def detect_message_type(content):
         return 'link', None
 
     return 'text', None
+
+
+def check_rate_limit(user_id, action='message'):
+    """Check if user has exceeded rate limit"""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Clean up old entries
+    cutoff = datetime.now() - timedelta(seconds=RATE_LIMIT_WINDOW)
+    cursor.execute('''
+        DELETE FROM rate_limits
+        WHERE timestamp < ?
+    ''', (cutoff,))
+
+    # Count recent actions
+    cursor.execute('''
+        SELECT COUNT(*) FROM rate_limits
+        WHERE user_id = ? AND action = ? AND timestamp > ?
+    ''', (user_id, action, cutoff))
+
+    count = cursor.fetchone()[0]
+    conn.commit()
+    conn.close()
+
+    return count < RATE_LIMIT_MESSAGES
+
+
+def record_rate_limit(user_id, action='message'):
+    """Record a rate-limited action"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO rate_limits (user_id, action, timestamp)
+        VALUES (?, ?, ?)
+    ''', (user_id, action, datetime.now()))
+    conn.commit()
+    conn.close()
+
+
+def update_user_presence(user_id, channel_id):
+    """Update user's last seen timestamp"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT OR REPLACE INTO user_presence (user_id, channel_id, last_seen)
+        VALUES (?, ?, ?)
+    ''', (user_id, channel_id, datetime.now()))
+    conn.commit()
+    conn.close()
+
+
+def get_active_users(channel_id, minutes=5):
+    """Get users active in the last N minutes"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cutoff = datetime.now() - timedelta(minutes=minutes)
+    cursor.execute('''
+        SELECT u.id, u.username, p.last_seen
+        FROM user_presence p
+        JOIN users u ON p.user_id = u.id
+        WHERE p.channel_id = ? AND p.last_seen > ?
+        ORDER BY p.last_seen DESC
+    ''', (channel_id, cutoff))
+    users = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return users
+
+
+def parse_markdown(text):
+    """Parse markdown and sanitize HTML"""
+    # Convert markdown to HTML
+    html = markdown.markdown(text, extensions=['fenced_code', 'nl2br', 'sane_lists'])
+
+    # Sanitize HTML to prevent XSS
+    allowed_tags = [
+        'p', 'br', 'strong', 'em', 'u', 'code', 'pre',
+        'a', 'ul', 'ol', 'li', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
+    ]
+    allowed_attrs = {'a': ['href', 'title'], 'code': ['class']}
+
+    clean_html = bleach.clean(html, tags=allowed_tags, attributes=allowed_attrs, strip=True)
+
+    # Make links open in new tab and add nofollow
+    clean_html = clean_html.replace('<a ', '<a target="_blank" rel="nofollow noopener" ')
+
+    return clean_html
+
+
+def optimize_image(filepath, max_size_mb=2):
+    """Optimize image file size while maintaining reasonable quality"""
+    try:
+        with Image.open(filepath) as img:
+            # Convert RGBA to RGB if needed (for JPEG)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+
+            # Get file size
+            file_size = os.path.getsize(filepath)
+            max_bytes = max_size_mb * 1024 * 1024
+
+            # If already under limit, just optimize quality
+            if file_size < max_bytes:
+                img.save(filepath, quality=85, optimize=True)
+                return
+
+            # Calculate resize ratio needed
+            ratio = (max_bytes / file_size) ** 0.5
+            new_width = int(img.width * ratio)
+            new_height = int(img.height * ratio)
+
+            # Resize and save
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            img.save(filepath, quality=80, optimize=True)
+
+    except Exception as e:
+        print(f"Image optimization failed: {e}")
+
+
+def broadcast_message(channel_id, message_data):
+    """Broadcast message to all connected clients via SSE"""
+    with queue_lock:
+        for user_queue in message_queues.values():
+            try:
+                user_queue.put({
+                    'type': 'message',
+                    'channel_id': channel_id,
+                    'data': message_data
+                })
+            except:
+                pass
 
 
 @app.route('/')
@@ -180,6 +336,51 @@ def gallery():
         return redirect(url_for('login'))
 
     return render_template('gallery.html')
+
+
+@app.route('/api/stream/<int:channel_id>')
+def message_stream(channel_id):
+    """Server-Sent Events stream for real-time updates"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    def event_generator():
+        # Create a queue for this user
+        user_queue = queue.Queue(maxsize=50)
+        user_id = session.get('user_id')
+
+        with queue_lock:
+            message_queues[user_id] = user_queue
+
+        try:
+            # Send initial connection message
+            yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+
+            while True:
+                try:
+                    # Wait for messages with timeout to send heartbeat
+                    msg = user_queue.get(timeout=30)
+
+                    # Only send messages for the current channel
+                    if msg.get('channel_id') == channel_id or msg.get('type') in ['reaction', 'edit', 'pin', 'presence']:
+                        yield f"data: {json.dumps(msg)}\n\n"
+                except queue.Empty:
+                    # Send heartbeat to keep connection alive
+                    yield f": heartbeat\n\n"
+
+        except GeneratorExit:
+            # Client disconnected
+            with queue_lock:
+                if user_id in message_queues:
+                    del message_queues[user_id]
+
+    return Response(stream_with_context(event_generator()),
+                   mimetype='text/event-stream',
+                   headers={
+                       'Cache-Control': 'no-cache',
+                       'X-Accel-Buffering': 'no',
+                       'Connection': 'keep-alive'
+                   })
 
 
 # API Endpoints
@@ -321,16 +522,35 @@ def change_user_password():
 
 @app.route('/api/channels', methods=['GET'])
 def get_channels():
-    """Get all channels"""
+    """Get all channels with unread counts"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
+    user_id = session['user_id']
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT id, name, display_name FROM channels ORDER BY id ASC')
-    channels = [dict(row) for row in cursor.fetchall()]
-    conn.close()
 
+    cursor.execute('SELECT id, name, display_name, description FROM channels ORDER BY id ASC')
+    channels = [dict(row) for row in cursor.fetchall()]
+
+    # Get unread counts for each channel
+    for channel in channels:
+        # Get last read message ID
+        cursor.execute('''
+            SELECT last_read_message_id FROM unread_tracking
+            WHERE user_id = ? AND channel_id = ?
+        ''', (user_id, channel['id']))
+        result = cursor.fetchone()
+        last_read_id = result['last_read_message_id'] if result else 0
+
+        # Count messages after last read
+        cursor.execute('''
+            SELECT COUNT(*) as unread_count FROM messages
+            WHERE channel_id = ? AND id > ?
+        ''', (channel['id'], last_read_id))
+        channel['unread_count'] = cursor.fetchone()['unread_count']
+
+    conn.close()
     return jsonify(channels)
 
 
@@ -372,6 +592,11 @@ def get_messages(channel_id):
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
+    user_id = session['user_id']
+
+    # Update user presence
+    update_user_presence(user_id, channel_id)
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -399,19 +624,25 @@ def get_messages(channel_id):
         else:
             break
 
-    # Get messages with user info
+    # Get messages with user info including avatar color
     cursor.execute('''
-        SELECT m.id, m.message_type, m.content, m.metadata, m.timestamp,
-               u.username
+        SELECT m.id, m.message_type, m.content, m.metadata, m.timestamp, m.user_id,
+               u.username, u.avatar_color,
+               CASE WHEN me.message_id IS NOT NULL THEN 1 ELSE 0 END as edited,
+               CASE WHEN pm.message_id IS NOT NULL THEN 1 ELSE 0 END as pinned
         FROM messages m
         JOIN users u ON m.user_id = u.id
+        LEFT JOIN (SELECT DISTINCT message_id FROM message_edits) me ON m.id = me.message_id
+        LEFT JOIN pinned_messages pm ON m.id = pm.message_id
         WHERE m.channel_id = ?
         ORDER BY m.timestamp ASC
     ''', (channel_id,))
 
     messages = []
+    message_ids = []
     for row in cursor.fetchall():
         msg = dict(row)
+        message_ids.append(msg['id'])
 
         # Parse metadata if exists
         if msg['metadata']:
@@ -419,6 +650,24 @@ def get_messages(channel_id):
                 msg['metadata'] = json.loads(msg['metadata'])
             except:
                 msg['metadata'] = None
+
+        # Get reactions for this message
+        cursor.execute('''
+            SELECT r.emoji, u.username, r.user_id
+            FROM reactions r
+            JOIN users u ON r.user_id = u.id
+            WHERE r.message_id = ?
+        ''', (msg['id'],))
+        reactions = {}
+        for react_row in cursor.fetchall():
+            emoji = react_row['emoji']
+            if emoji not in reactions:
+                reactions[emoji] = []
+            reactions[emoji].append({
+                'username': react_row['username'],
+                'user_id': react_row['user_id']
+            })
+        msg['reactions'] = reactions
 
         # If it's an image, check if it should be loaded
         if msg['message_type'] == 'image':
@@ -435,10 +684,45 @@ def get_messages(channel_id):
                 if img_data:
                     msg['image'] = dict(img_data)
 
+        # If it's a file, get file details
+        elif msg['message_type'] == 'file':
+            file_id = int(msg['content'])
+            cursor.execute('''
+                SELECT filename, original_filename, file_size, mime_type
+                FROM files WHERE id = ?
+            ''', (file_id,))
+            file_data = cursor.fetchone()
+            if file_data:
+                msg['file'] = dict(file_data)
+
         messages.append(msg)
 
+    # Get active users
+    active_users = get_active_users(channel_id)
+
+    # Get pinned messages
+    cursor.execute('''
+        SELECT message_id FROM pinned_messages
+        WHERE channel_id = ?
+    ''', (channel_id,))
+    pinned_ids = [row['message_id'] for row in cursor.fetchall()]
+
+    # Mark channel as read (update to last message ID)
+    if messages:
+        last_message_id = messages[-1]['id']
+        cursor.execute('''
+            INSERT OR REPLACE INTO unread_tracking (user_id, channel_id, last_read_message_id)
+            VALUES (?, ?, ?)
+        ''', (user_id, channel_id, last_message_id))
+        conn.commit()
+
     conn.close()
-    return jsonify({'messages': messages, 'total_image_size': total_size})
+    return jsonify({
+        'messages': messages,
+        'total_image_size': total_size,
+        'active_users': active_users,
+        'pinned_messages': pinned_ids
+    })
 
 
 @app.route('/api/messages/<int:channel_id>', methods=['POST'])
@@ -447,13 +731,20 @@ def post_message(channel_id):
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
+    # Check rate limit
+    user_id = session['user_id']
+    if not check_rate_limit(user_id, 'message'):
+        return jsonify({'error': 'Rate limit exceeded. Please slow down.'}), 429
+
     data = request.get_json()
     content = data.get('message', '').strip()
+    use_markdown = data.get('markdown', True)  # Enable markdown by default
 
     if not content:
         return jsonify({'error': 'Message cannot be empty'}), 400
 
-    user_id = session['user_id']
+    # Record rate limit
+    record_rate_limit(user_id, 'message')
 
     # Detect message type
     message_type, metadata = detect_message_type(content)
@@ -474,10 +765,17 @@ def post_message(channel_id):
     conn.commit()
     message_id = cursor.lastrowid
 
+    # Add to full-text search index
+    if message_type == 'text':
+        cursor.execute('''
+            INSERT INTO messages_fts (rowid, content) VALUES (?, ?)
+        ''', (message_id, content))
+        conn.commit()
+
     # Get the new message with user info
     cursor.execute('''
-        SELECT m.id, m.message_type, m.content, m.metadata, m.timestamp,
-               u.username
+        SELECT m.id, m.message_type, m.content, m.metadata, m.timestamp, m.user_id,
+               u.username, u.avatar_color
         FROM messages m
         JOIN users u ON m.user_id = u.id
         WHERE m.id = ?
@@ -490,7 +788,52 @@ def post_message(channel_id):
         except:
             new_message['metadata'] = None
 
+    new_message['reactions'] = {}
+    new_message['edited'] = 0
+    new_message['pinned'] = 0
+
+    # Parse markdown if it's a text message and detect @mentions
+    mentioned_users = []
+    if message_type == 'text':
+        # Detect @mentions
+        mention_pattern = r'@(\w+)'
+        matches = re.findall(mention_pattern, content)
+        if matches:
+            # Get user IDs for mentioned usernames
+            placeholders = ','.join('?' * len(matches))
+            cursor.execute(f'SELECT id, username FROM users WHERE username IN ({placeholders})', matches)
+            mentioned_users = [dict(row) for row in cursor.fetchall()]
+
+        if use_markdown:
+            new_message['content_html'] = parse_markdown(content)
+            # Highlight mentions in HTML
+            for mentioned in mentioned_users:
+                new_message['content_html'] = new_message['content_html'].replace(
+                    f'@{mentioned["username"]}',
+                    f'<span class="mention">@{mentioned["username"]}</span>'
+                )
+
     conn.close()
+
+    # Broadcast via SSE
+    broadcast_message(channel_id, new_message)
+
+    # Send mention notifications to mentioned users
+    if mentioned_users:
+        sender_username = new_message['username']
+        with queue_lock:
+            for user_queue in message_queues.values():
+                try:
+                    user_queue.put({
+                        'type': 'mention',
+                        'message_id': message_id,
+                        'channel_id': channel_id,
+                        'sender': sender_username,
+                        'mentioned_users': [u['username'] for u in mentioned_users]
+                    })
+                except:
+                    pass
+
     return jsonify(new_message), 201
 
 
@@ -533,6 +876,9 @@ def upload_image(channel_id):
 
     # Save original
     file.save(filepath)
+
+    # Optimize the original image
+    optimize_image(filepath, max_size_mb=2)
 
     # Create thumbnail
     try:
@@ -642,6 +988,611 @@ def check_admin():
         'is_admin': is_admin(session['user_id']),
         'username': user_info['username'] if user_info else None
     })
+
+
+@app.route('/api/messages/<int:message_id>/react', methods=['POST'])
+def add_reaction(message_id):
+    """Add a reaction to a message"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    emoji = data.get('emoji', '').strip()
+
+    if not emoji:
+        return jsonify({'error': 'Emoji required'}), 400
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Get message info
+    cursor.execute('SELECT channel_id FROM messages WHERE id = ?', (message_id,))
+    result = cursor.fetchone()
+    if not result:
+        conn.close()
+        return jsonify({'error': 'Message not found'}), 404
+
+    channel_id = result['channel_id']
+
+    try:
+        cursor.execute('''
+            INSERT INTO reactions (message_id, user_id, emoji)
+            VALUES (?, ?, ?)
+        ''', (message_id, user_id, emoji))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        # Already reacted with this emoji
+        conn.close()
+        return jsonify({'error': 'Already reacted'}), 400
+
+    # Get username
+    cursor.execute('SELECT username FROM users WHERE id = ?', (user_id,))
+    username = cursor.fetchone()['username']
+
+    conn.close()
+
+    # Broadcast reaction via SSE
+    with queue_lock:
+        for user_queue in message_queues.values():
+            try:
+                user_queue.put({
+                    'type': 'reaction',
+                    'action': 'add',
+                    'message_id': message_id,
+                    'emoji': emoji,
+                    'username': username,
+                    'user_id': user_id
+                })
+            except:
+                pass
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/messages/<int:message_id>/react', methods=['DELETE'])
+def remove_reaction(message_id):
+    """Remove a reaction from a message"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    emoji = data.get('emoji', '').strip()
+
+    if not emoji:
+        return jsonify({'error': 'Emoji required'}), 400
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        DELETE FROM reactions
+        WHERE message_id = ? AND user_id = ? AND emoji = ?
+    ''', (message_id, user_id, emoji))
+    conn.commit()
+    conn.close()
+
+    # Broadcast reaction removal via SSE
+    with queue_lock:
+        for user_queue in message_queues.values():
+            try:
+                user_queue.put({
+                    'type': 'reaction',
+                    'action': 'remove',
+                    'message_id': message_id,
+                    'emoji': emoji,
+                    'user_id': user_id
+                })
+            except:
+                pass
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/messages/<int:message_id>/edit', methods=['PUT'])
+def edit_message(message_id):
+    """Edit a message"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    new_content = data.get('content', '').strip()
+
+    if not new_content:
+        return jsonify({'error': 'Content cannot be empty'}), 400
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Get current message
+    cursor.execute('''
+        SELECT content, user_id, channel_id, message_type
+        FROM messages WHERE id = ?
+    ''', (message_id,))
+    result = cursor.fetchone()
+
+    if not result:
+        conn.close()
+        return jsonify({'error': 'Message not found'}), 404
+
+    old_content = result['content']
+    msg_user_id = result['user_id']
+    channel_id = result['channel_id']
+    message_type = result['message_type']
+
+    # Only allow editing own messages
+    if msg_user_id != user_id:
+        conn.close()
+        return jsonify({'error': 'Cannot edit other users messages'}), 403
+
+    # Only allow editing text messages
+    if message_type != 'text':
+        conn.close()
+        return jsonify({'error': 'Can only edit text messages'}), 400
+
+    # Save edit history
+    cursor.execute('''
+        INSERT INTO message_edits (message_id, old_content)
+        VALUES (?, ?)
+    ''', (message_id, old_content))
+
+    # Update message
+    cursor.execute('''
+        UPDATE messages SET content = ?
+        WHERE id = ?
+    ''', (new_content, message_id))
+
+    # Update FTS index
+    cursor.execute('''
+        UPDATE messages_fts SET content = ?
+        WHERE rowid = ?
+    ''', (new_content, message_id))
+
+    conn.commit()
+    conn.close()
+
+    # Broadcast edit via SSE
+    with queue_lock:
+        for user_queue in message_queues.values():
+            try:
+                user_queue.put({
+                    'type': 'edit',
+                    'message_id': message_id,
+                    'content': new_content,
+                    'content_html': parse_markdown(new_content),
+                    'channel_id': channel_id
+                })
+            except:
+                pass
+
+    return jsonify({'success': True, 'content': new_content, 'content_html': parse_markdown(new_content)})
+
+
+@app.route('/api/messages/<int:message_id>/pin', methods=['POST'])
+def pin_message(message_id):
+    """Pin a message (admin only)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    if not is_admin(session['user_id']):
+        return jsonify({'error': 'Admin privileges required'}), 403
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Get message channel
+    cursor.execute('SELECT channel_id FROM messages WHERE id = ?', (message_id,))
+    result = cursor.fetchone()
+    if not result:
+        conn.close()
+        return jsonify({'error': 'Message not found'}), 404
+
+    channel_id = result['channel_id']
+
+    try:
+        cursor.execute('''
+            INSERT INTO pinned_messages (message_id, channel_id, pinned_by)
+            VALUES (?, ?, ?)
+        ''', (message_id, channel_id, session['user_id']))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({'error': 'Message already pinned'}), 400
+
+    conn.close()
+
+    # Broadcast pin via SSE
+    with queue_lock:
+        for user_queue in message_queues.values():
+            try:
+                user_queue.put({
+                    'type': 'pin',
+                    'action': 'add',
+                    'message_id': message_id,
+                    'channel_id': channel_id
+                })
+            except:
+                pass
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/messages/<int:message_id>/pin', methods=['DELETE'])
+def unpin_message(message_id):
+    """Unpin a message (admin only)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    if not is_admin(session['user_id']):
+        return jsonify({'error': 'Admin privileges required'}), 403
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT channel_id FROM pinned_messages WHERE message_id = ?', (message_id,))
+    result = cursor.fetchone()
+    if not result:
+        conn.close()
+        return jsonify({'error': 'Message not pinned'}), 404
+
+    channel_id = result['channel_id']
+
+    cursor.execute('DELETE FROM pinned_messages WHERE message_id = ?', (message_id,))
+    conn.commit()
+    conn.close()
+
+    # Broadcast unpin via SSE
+    with queue_lock:
+        for user_queue in message_queues.values():
+            try:
+                user_queue.put({
+                    'type': 'pin',
+                    'action': 'remove',
+                    'message_id': message_id,
+                    'channel_id': channel_id
+                })
+            except:
+                pass
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/search', methods=['GET'])
+def search_messages():
+    """Search messages using full-text search"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    query = request.args.get('q', '').strip()
+    channel_id = request.args.get('channel_id', type=int)
+
+    if not query:
+        return jsonify({'error': 'Query required'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Build search query
+    search_query = '''
+        SELECT m.id, m.channel_id, m.content, m.timestamp, u.username, c.display_name as channel_name
+        FROM messages_fts fts
+        JOIN messages m ON fts.rowid = m.id
+        JOIN users u ON m.user_id = u.id
+        JOIN channels c ON m.channel_id = c.id
+        WHERE fts MATCH ?
+    '''
+
+    params = [query]
+
+    if channel_id:
+        search_query += ' AND m.channel_id = ?'
+        params.append(channel_id)
+
+    search_query += ' ORDER BY m.timestamp DESC LIMIT 50'
+
+    cursor.execute(search_query, params)
+    results = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return jsonify({'results': results})
+
+
+@app.route('/api/upload-file/<int:channel_id>', methods=['POST'])
+def upload_file(channel_id):
+    """Upload a file to channel"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not allowed_file(file.filename, 'file'):
+        return jsonify({'error': 'File type not allowed'}), 400
+
+    # Check file size
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+
+    if file_size > MAX_FILE_SIZE:
+        return jsonify({'error': f'File too large (max {MAX_FILE_SIZE // (1024*1024)}MB)'}), 400
+
+    user_id = session['user_id']
+    original_filename = secure_filename(file.filename)
+
+    # Generate unique filename
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    random_str = secrets.token_hex(4)
+    ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'bin'
+    filename = f"{timestamp}_{random_str}.{ext}"
+
+    filepath = os.path.join(FILES_FOLDER, filename)
+
+    # Save file
+    file.save(filepath)
+
+    # Get MIME type
+    mime_type = mimetypes.guess_type(original_filename)[0] or 'application/octet-stream'
+
+    # Save to database
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        INSERT INTO files (channel_id, user_id, filename, original_filename, file_size, mime_type)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (channel_id, user_id, filename, original_filename, file_size, mime_type))
+    file_id = cursor.lastrowid
+
+    # Create message pointing to this file
+    cursor.execute('''
+        INSERT INTO messages (channel_id, user_id, message_type, content)
+        VALUES (?, ?, 'file', ?)
+    ''', (channel_id, user_id, str(file_id)))
+    message_id = cursor.lastrowid
+
+    conn.commit()
+
+    # Get the message with user info
+    cursor.execute('''
+        SELECT m.id, m.message_type, m.content, m.timestamp, m.user_id,
+               u.username
+        FROM messages m
+        JOIN users u ON m.user_id = u.id
+        WHERE m.id = ?
+    ''', (message_id,))
+    new_message = dict(cursor.fetchone())
+    new_message['file'] = {
+        'filename': filename,
+        'original_filename': original_filename,
+        'file_size': file_size,
+        'mime_type': mime_type
+    }
+    new_message['reactions'] = {}
+    new_message['edited'] = 0
+    new_message['pinned'] = 0
+
+    conn.close()
+
+    # Broadcast via SSE
+    broadcast_message(channel_id, new_message)
+
+    return jsonify(new_message), 201
+
+
+@app.route('/uploads/files/<filename>')
+def serve_file(filename):
+    """Serve uploaded files"""
+    if 'user_id' not in session:
+        return "Unauthorized", 401
+    return send_from_directory(FILES_FOLDER, filename)
+
+
+@app.route('/api/presence/<int:channel_id>', methods=['GET'])
+def get_presence(channel_id):
+    """Get active users in a channel"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    active_users = get_active_users(channel_id)
+    return jsonify({'active_users': active_users})
+
+
+@app.route('/api/presence/<int:channel_id>', methods=['POST'])
+def update_presence(channel_id):
+    """Update user presence in a channel"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    update_user_presence(session['user_id'], channel_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/events', methods=['GET'])
+def get_events():
+    """Get all events"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT e.id, e.title, e.description, e.datetime, e.user_id, u.username,
+               DATE(e.datetime) as date
+        FROM events e
+        JOIN users u ON e.user_id = u.id
+        ORDER BY e.datetime ASC
+    ''')
+    events = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return jsonify({'events': events})
+
+
+@app.route('/api/events', methods=['POST'])
+def create_event():
+    """Create a new event"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    title = data.get('title', '').strip()
+    description = data.get('description', '').strip()
+    event_datetime = data.get('datetime', '').strip()
+
+    if not title or not event_datetime:
+        return jsonify({'error': 'Title and datetime required'}), 400
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        INSERT INTO events (user_id, title, description, datetime)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, title, description, event_datetime))
+    conn.commit()
+    event_id = cursor.lastrowid
+
+    # Get the created event with user info
+    cursor.execute('''
+        SELECT e.id, e.title, e.description, e.datetime, e.user_id, u.username,
+               DATE(e.datetime) as date
+        FROM events e
+        JOIN users u ON e.user_id = u.id
+        WHERE e.id = ?
+    ''', (event_id,))
+    event = dict(cursor.fetchone())
+    conn.close()
+
+    return jsonify(event), 201
+
+
+@app.route('/api/events/<int:event_id>', methods=['DELETE'])
+def delete_event(event_id):
+    """Delete an event"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Check if user owns the event or is admin
+    cursor.execute('SELECT user_id FROM events WHERE id = ?', (event_id,))
+    result = cursor.fetchone()
+
+    if not result:
+        conn.close()
+        return jsonify({'error': 'Event not found'}), 404
+
+    if result['user_id'] != user_id and not is_admin(user_id):
+        conn.close()
+        return jsonify({'error': 'Permission denied'}), 403
+
+    cursor.execute('DELETE FROM events WHERE id = ?', (event_id,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/messages/<int:message_id>', methods=['DELETE'])
+def delete_message(message_id):
+    """Delete a message"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Get message info
+    cursor.execute('SELECT user_id, channel_id, message_type, content FROM messages WHERE id = ?', (message_id,))
+    result = cursor.fetchone()
+
+    if not result:
+        conn.close()
+        return jsonify({'error': 'Message not found'}), 404
+
+    msg_user_id = result['user_id']
+    channel_id = result['channel_id']
+    message_type = result['message_type']
+    content = result['content']
+
+    # Check permission: owner or admin
+    if msg_user_id != user_id and not is_admin(user_id):
+        conn.close()
+        return jsonify({'error': 'Permission denied'}), 403
+
+    # Delete associated data first
+    cursor.execute('DELETE FROM reactions WHERE message_id = ?', (message_id,))
+    cursor.execute('DELETE FROM pinned_messages WHERE message_id = ?', (message_id,))
+    cursor.execute('DELETE FROM message_edits WHERE message_id = ?', (message_id,))
+    cursor.execute('DELETE FROM messages_fts WHERE rowid = ?', (message_id,))
+
+    # If it's an image, delete from images table and files
+    if message_type == 'image':
+        try:
+            image_id = int(content)
+            cursor.execute('SELECT filename, thumbnail_filename FROM images WHERE id = ?', (image_id,))
+            img_data = cursor.fetchone()
+            if img_data:
+                # Delete files from disk
+                import os
+                try:
+                    if os.path.exists(os.path.join(UPLOAD_FOLDER, img_data['filename'])):
+                        os.remove(os.path.join(UPLOAD_FOLDER, img_data['filename']))
+                    if os.path.exists(os.path.join(THUMBNAIL_FOLDER, img_data['thumbnail_filename'])):
+                        os.remove(os.path.join(THUMBNAIL_FOLDER, img_data['thumbnail_filename']))
+                except:
+                    pass
+                cursor.execute('DELETE FROM images WHERE id = ?', (image_id,))
+        except:
+            pass
+
+    # If it's a file, delete from files table and disk
+    elif message_type == 'file':
+        try:
+            file_id = int(content)
+            cursor.execute('SELECT filename FROM files WHERE id = ?', (file_id,))
+            file_data = cursor.fetchone()
+            if file_data:
+                try:
+                    if os.path.exists(os.path.join(FILES_FOLDER, file_data['filename'])):
+                        os.remove(os.path.join(FILES_FOLDER, file_data['filename']))
+                except:
+                    pass
+                cursor.execute('DELETE FROM files WHERE id = ?', (file_id,))
+        except:
+            pass
+
+    # Delete the message itself
+    cursor.execute('DELETE FROM messages WHERE id = ?', (message_id,))
+    conn.commit()
+    conn.close()
+
+    # Broadcast deletion via SSE
+    with queue_lock:
+        for user_queue in message_queues.values():
+            try:
+                user_queue.put({
+                    'type': 'delete',
+                    'message_id': message_id,
+                    'channel_id': channel_id
+                })
+            except:
+                pass
+
+    return jsonify({'success': True})
 
 
 if __name__ == '__main__':

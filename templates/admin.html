@@ -41,7 +41,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 2rem auto;
             padding: 0 1rem;
         }
@@ -61,7 +61,22 @@
         }
 
         .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            align-items: end;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .form-row button {
+            flex-shrink: 0;
         }
 
         label {
@@ -69,14 +84,23 @@
             margin-bottom: 0.5rem;
             color: #555;
             font-weight: 500;
+            font-size: 0.9rem;
         }
 
-        input[type="text"], input[type="tel"] {
-            width: 100%;
+        input[type="text"], input[type="password"], input[type="checkbox"] {
             padding: 0.75rem;
             border: 2px solid #ddd;
             border-radius: 5px;
             font-size: 1rem;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+        }
+
+        input[type="checkbox"] {
+            width: auto;
+            margin-right: 0.5rem;
         }
 
         input:focus {
@@ -119,14 +143,61 @@
             color: #721c24;
         }
 
-        .pin-display {
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
             background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 5px;
-            margin-bottom: 1rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .password-cell {
             font-family: monospace;
-            font-size: 1.1rem;
-            text-align: center;
+            background: #f8f9fa;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+        }
+
+        .admin-badge {
+            background: #667eea;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .form-row button {
+                width: 100%;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            th, td {
+                padding: 0.5rem;
+            }
         }
     </style>
 </head>
@@ -138,36 +209,52 @@
 
     <div class="container">
         <div class="card">
-            <h2>Change PIN</h2>
-            <div class="message" id="pinMessage"></div>
+            <h2>Create New User</h2>
+            <div class="message" id="createMessage"></div>
 
-            <form id="pinForm" onsubmit="changePin(event)">
-                <div class="form-group">
-                    <label for="newPin">New 6-Digit PIN:</label>
-                    <input type="tel" id="newPin" required maxlength="6" inputmode="numeric" placeholder="000000">
+            <form id="createUserForm" onsubmit="createUser(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="newUsername">Username:</label>
+                        <input type="text" id="newUsername" required placeholder="Enter username">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newPassword">Password:</label>
+                        <input type="text" id="newPassword" required minlength="4" placeholder="Min 4 characters">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="makeAdmin">
+                            Make Admin
+                        </label>
+                    </div>
+
+                    <button type="submit">Create User</button>
                 </div>
-
-                <div class="form-group">
-                    <label for="confirmPin">Confirm PIN:</label>
-                    <input type="tel" id="confirmPin" required maxlength="6" inputmode="numeric" placeholder="000000">
-                </div>
-
-                <button type="submit">Update PIN</button>
             </form>
         </div>
 
         <div class="card">
-            <h2>Add Admin User</h2>
-            <div class="message" id="adminMessage"></div>
+            <h2>All Users</h2>
+            <div class="message" id="usersMessage"></div>
 
-            <form id="adminForm" onsubmit="addAdmin(event)">
-                <div class="form-group">
-                    <label for="newAdmin">Username:</label>
-                    <input type="text" id="newAdmin" required placeholder="Enter username">
-                </div>
-
-                <button type="submit">Add Admin</button>
-            </form>
+            <table id="usersTable">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Password</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #999;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -181,77 +268,81 @@
             }, 5000);
         }
 
-        async function changePin(event) {
+        async function createUser(event) {
             event.preventDefault();
 
-            const newPin = document.getElementById('newPin').value.trim();
-            const confirmPin = document.getElementById('confirmPin').value.trim();
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value.trim();
+            const is_admin = document.getElementById('makeAdmin').checked;
 
-            if (newPin.length !== 6 || !/^\d+$/.test(newPin)) {
-                showMessage('pinMessage', 'PIN must be exactly 6 digits', false);
+            if (!username || !password) {
+                showMessage('createMessage', 'Username and password required', false);
                 return;
             }
 
-            if (newPin !== confirmPin) {
-                showMessage('pinMessage', 'PINs do not match', false);
+            if (password.length < 4) {
+                showMessage('createMessage', 'Password must be at least 4 characters', false);
                 return;
             }
 
             try {
-                const response = await fetch('/api/admin/set-pin', {
+                const response = await fetch('/api/users', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ pin: newPin })
+                    body: JSON.stringify({ username, password, is_admin })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    showMessage('pinMessage', 'PIN updated successfully!', true);
-                    document.getElementById('pinForm').reset();
+                    showMessage('createMessage', `User created: ${username} (Password: ${data.user.password})`, true);
+                    document.getElementById('createUserForm').reset();
+                    loadUsers();
                 } else {
-                    showMessage('pinMessage', data.error || 'Failed to update PIN', false);
+                    showMessage('createMessage', data.error || 'Failed to create user', false);
                 }
             } catch (error) {
-                console.error('Error updating PIN:', error);
-                showMessage('pinMessage', 'Failed to update PIN', false);
+                console.error('Error creating user:', error);
+                showMessage('createMessage', 'Failed to create user', false);
             }
         }
 
-        async function addAdmin(event) {
-            event.preventDefault();
-
-            const username = document.getElementById('newAdmin').value.trim();
-
-            if (!username) {
-                showMessage('adminMessage', 'Username is required', false);
-                return;
-            }
-
+        async function loadUsers() {
             try {
-                const response = await fetch('/api/admin/add-admin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ username })
-                });
+                const response = await fetch('/api/users');
+                const users = await response.json();
 
-                const data = await response.json();
+                const tbody = document.getElementById('usersTableBody');
 
-                if (response.ok) {
-                    showMessage('adminMessage', data.message, true);
-                    document.getElementById('adminForm').reset();
-                } else {
-                    showMessage('adminMessage', data.error || 'Failed to add admin', false);
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999;">No users yet</td></tr>';
+                    return;
                 }
+
+                tbody.innerHTML = users.map(user => `
+                    <tr>
+                        <td>${escapeHtml(user.username)}</td>
+                        <td><span class="password-cell">••••••••</span></td>
+                        <td>${user.is_admin ? '<span class="admin-badge">Admin</span>' : 'User'}</td>
+                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                    </tr>
+                `).join('');
             } catch (error) {
-                console.error('Error adding admin:', error);
-                showMessage('adminMessage', 'Failed to add admin', false);
+                console.error('Error loading users:', error);
+                showMessage('usersMessage', 'Failed to load users', false);
             }
         }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load users on page load
+        loadUsers();
     </script>
 </body>
 </html>

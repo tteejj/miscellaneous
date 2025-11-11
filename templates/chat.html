@@ -487,6 +487,36 @@
             background: #e5e7eb;
         }
 
+        .message-image {
+            max-width: 100%;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+
+        .message-image img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+
+        .youtube-preview {
+            margin-top: 0.5rem;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .youtube-preview iframe {
+            width: 100%;
+            height: 315px;
+            border: none;
+        }
+
+        .link-preview {
+            color: #667eea;
+            text-decoration: underline;
+        }
+
         .input-container {
             padding: 1rem;
             background: var(--bg-secondary);
@@ -1135,9 +1165,8 @@
                 if (isAdmin) {
                     document.getElementById('adminBtn').style.display = 'block';
                 }
-            } catch (error) {
-                console.error('Error checking admin status:', error);
-            }
+            };
+            xhr.send();
         }
 
         async function loadChannels() {
@@ -1282,12 +1311,17 @@
                 const data = await response.json();
                 const messages = data.messages || [];
 
-                const messagesDiv = document.getElementById('messages');
+                        if (messages.length === 0) {
+                            messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+                            return;
+                        }
 
-                if (messages.length === 0) {
-                    messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
-                    return;
-                }
+                        var newMessages = [];
+                        for (var i = 0; i < messages.length; i++) {
+                            if (messages[i].id > lastMessageId) {
+                                newMessages.push(messages[i]);
+                            }
+                        }
 
                 // Check if this is the pictures channel
                 const channelName = document.getElementById('currentChannelName').textContent.toLowerCase();
@@ -1539,10 +1573,43 @@
                     const data = await response.json();
                     alert(data.error || 'Failed to send message');
                 }
-            } catch (error) {
-                console.error('Error sending message:', error);
-                alert('Failed to send message');
+            };
+            xhr.send(JSON.stringify({ message: message }));
+        }
+
+        function uploadImage() {
+            var fileInput = document.getElementById('fileInput');
+            var file = fileInput.files[0];
+
+            if (!file) return;
+
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File too large. Maximum size is 10MB.');
+                fileInput.value = '';
+                return;
             }
+
+            var formData = new FormData();
+            formData.append('file', file);
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload/' + currentChannelId, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200 || xhr.status === 201) {
+                        fileInput.value = '';
+                        loadMessages();
+                    } else {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            alert(data.error || 'Failed to upload image');
+                        } catch (e) {
+                            alert('Failed to upload image');
+                        }
+                    }
+                }
+            };
+            xhr.send(formData);
         }
 
         async function deleteMessage(messageId) {
@@ -2113,7 +2180,8 @@
 
         // Initialize on mobile - hide sidebar by default
         if (window.innerWidth <= 768) {
-            document.getElementById('sidebar').classList.add('hidden');
+            var sidebar = document.getElementById('sidebar');
+            sidebar.className = sidebar.className + ' hidden';
         }
 
         // Update presence every 30 seconds

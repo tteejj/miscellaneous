@@ -260,11 +260,11 @@
 
     <script>
         function showMessage(elementId, message, isSuccess) {
-            const element = document.getElementById(elementId);
+            var element = document.getElementById(elementId);
             element.textContent = message;
             element.className = 'message show ' + (isSuccess ? 'success' : 'error');
-            setTimeout(() => {
-                element.classList.remove('show');
+            setTimeout(function() {
+                element.className = element.className.replace(' show', '').replace('show', '');
             }, 5000);
         }
 

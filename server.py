@@ -301,19 +301,18 @@ def logout():
 
 @app.route('/setup')
 def setup_page():
-    """Initial setup page - localhost only"""
-    if not is_localhost():
-        return "Setup is only accessible from localhost", 403
-
+    """Initial setup page - accessible from anywhere if no users exist"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM users')
     user_count = cursor.fetchone()[0]
     conn.close()
 
+    # If users exist, redirect to login
     if user_count > 0:
         return redirect(url_for('login'))
 
+    # If no users exist, allow setup from anywhere (first-time setup)
     return render_template('setup.html')
 
 
@@ -387,10 +386,7 @@ def message_stream(channel_id):
 
 @app.route('/api/setup', methods=['POST'])
 def initial_setup():
-    """Create first admin user - localhost only"""
-    if not is_localhost():
-        return jsonify({'error': 'Setup only accessible from localhost'}), 403
-
+    """Create first admin user - accessible from anywhere if no users exist"""
     data = request.get_json()
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()

@@ -75,7 +75,8 @@ fi
 # Install Python packages
 echo "🐍 Installing Python dependencies..."
 if [ "$EUID" -eq 0 ]; then
-    pip3 install -r requirements.txt
+    # Running as root - use break-system-packages for newer Debian/DietPi
+    pip3 install --break-system-packages -r requirements.txt 2>/dev/null || pip3 install -r requirements.txt
 else
     pip3 install --user -r requirements.txt
 fi

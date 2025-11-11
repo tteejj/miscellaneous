@@ -24,12 +24,18 @@ if ! command -v podman &> /dev/null; then
     exit 1
 fi
 
-# Create data directories
+# Create data directories with proper ownership
 echo "📁 Creating data directories..."
 mkdir -p "$DATA_PATH"
 mkdir -p "$UPLOADS_PATH"
 mkdir -p "$UPLOADS_PATH/thumbnails"
 mkdir -p "$UPLOADS_PATH/files"
+
+# Ensure proper permissions (writable by container user UID 1000)
+if [ "$EUID" -eq 0 ]; then
+    chown -R 1000:1000 "$DATA_PATH"
+fi
+chmod -R 755 "$DATA_PATH"
 
 # Copy source files to build context
 echo "📦 Preparing build context..."

@@ -4,14 +4,7 @@ set -e
 echo "🚀 Installing RPi Chat Server (systemd version)..."
 echo ""
 
-# Check if running as root
-if [ "$EUID" -eq 0 ]; then
-    echo "❌ Please run as regular user (not root/sudo)"
-    echo "   The script will ask for sudo when needed"
-    exit 1
-fi
-
-# Detect distribution
+# Detect distribution first
 detect_distro() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
@@ -28,23 +21,45 @@ detect_distro() {
 
 detect_distro
 
+# Check if running as root (allow on DietPi, warn on others)
+if [ "$EUID" -eq 0 ]; then
+    if [[ "$DISTRO" == "dietpi" ]]; then
+        echo "📋 Running as root on DietPi (default setup)"
+        SUDO=""
+        INSTALL_USER="root"
+        INSTALL_HOME="/root"
+    else
+        echo "❌ Please run as regular user (not root/sudo)"
+        echo "   The script will ask for sudo when needed"
+        echo ""
+        echo "   On DietPi, create a user first:"
+        echo "   useradd -m -s /bin/bash pi && passwd pi && usermod -aG sudo pi"
+        exit 1
+    fi
+else
+    SUDO="sudo"
+    INSTALL_USER="$USER"
+    INSTALL_HOME="$HOME"
+fi
+
 echo "📋 Detected distribution: $DISTRO"
+echo "👤 Installing as: $INSTALL_USER"
 echo ""
 
 # Install dependencies based on distro
 if [[ "$DISTRO" == "void" ]]; then
     echo "📦 Updating system packages (Void Linux)..."
-    sudo xbps-install -Su
+    $SUDO xbps-install -Su
 
     echo "📦 Installing dependencies..."
-    sudo xbps-install -y python3 python3-pip python3-Pillow sqlite git
+    $SUDO xbps-install -y python3 python3-pip python3-Pillow sqlite git
 
 elif [[ "$DISTRO" == "debian" ]] || [[ "$DISTRO" == "ubuntu" ]] || [[ "$DISTRO" == "raspbian" ]] || [[ "$DISTRO" == "dietpi" ]]; then
     echo "📦 Updating system packages (Debian/Ubuntu/DietPi)..."
-    sudo apt-get update
+    $SUDO apt-get update
 
     echo "📦 Installing dependencies..."
-    sudo apt-get install -y python3-pip python3-pil sqlite3 git
+    $SUDO apt-get install -y python3-pip python3-pil sqlite3 git
 
 else
     echo "❌ Unsupported distribution: $DISTRO"
@@ -52,9 +67,13 @@ else
     exit 1
 fi
 
-# Install Python packages (works on all distros)
+# Install Python packages
 echo "🐍 Installing Python dependencies..."
-pip3 install --user -r requirements.txt
+if [ "$EUID" -eq 0 ]; then
+    pip3 install -r requirements.txt
+else
+    pip3 install --user -r requirements.txt
+fi
 
 # Initialize database
 echo "💾 Initializing database..."
@@ -63,12 +82,42 @@ python3 database.py
 # Install systemd service
 echo "⚙️  Installing systemd service..."
 WORKING_DIR=$(pwd)
-sed "s|WorkingDirectory=.*|WorkingDirectory=$WORKING_DIR|g" rpi-chat.service > /tmp/rpi-chat.service
-sed -i "s|User=.*|User=$USER|g" /tmp/rpi-chat.service
-sudo mv /tmp/rpi-chat.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable rpi-chat
-sudo systemctl start rpi-chat
+
+# Create service file with correct paths
+cat > /tmp/rpi-chat.service << EOF
+[Unit]
+Description=RPi Local Chat Server
+After=network.target
+
+[Service]
+Type=simple
+User=$INSTALL_USER
+WorkingDirectory=$WORKING_DIR
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/usr/bin/python3 $WORKING_DIR/server.py
+Restart=always
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+$SUDO mv /tmp/rpi-chat.service /etc/systemd/system/
+$SUDO systemctl daemon-reload
+$SUDO systemctl enable rpi-chat
+$SUDO systemctl start rpi-chat
+
+# Check if service started successfully
+sleep 2
+if $SUDO systemctl is-active --quiet rpi-chat; then
+    echo "✅ Chat service started successfully"
+else
+    echo "⚠️  Warning: Service may not have started. Check: sudo systemctl status rpi-chat"
+fi
 
 # Get local IP
 LOCAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
@@ -87,24 +136,31 @@ echo "🔐 For HTTPS (choose one):"
 echo ""
 echo "1️⃣  Tailscale Funnel (Easiest - Public HTTPS)"
 if [[ "$DISTRO" == "void" ]]; then
-    echo "   sudo xbps-install -y tailscale"
-    echo "   sudo sv up tailscaled  # Enable service"
-    echo "   sudo tailscale up"
+    echo "   $SUDO xbps-install -y tailscale"
+    echo "   $SUDO sv up tailscaled  # Enable service"
+    echo "   $SUDO tailscale up"
+elif [[ "$DISTRO" == "dietpi" ]]; then
+    echo "   $SUDO apt-get install -y tailscale"
+    echo "   $SUDO systemctl enable --now tailscaled"
+    echo "   $SUDO tailscale up"
 else
     echo "   curl -fsSL https://tailscale.com/install.sh | sh"
-    echo "   sudo tailscale up"
+    echo "   $SUDO tailscale up"
 fi
-echo "   tailscale funnel --bg 5000 on"
+echo "   $SUDO tailscale funnel --bg 5000 on"
 echo "   Access: https://\$(tailscale status --json | jq -r '.Self.DNSName'):5000"
 echo ""
 echo "2️⃣  Caddy (Public Internet with Domain)"
 if [[ "$DISTRO" == "void" ]]; then
-    echo "   sudo xbps-install -y caddy"
+    echo "   $SUDO xbps-install -y caddy"
+elif [[ "$DISTRO" == "dietpi" ]]; then
+    echo "   $SUDO apt-get install -y caddy"
+    echo "   $SUDO systemctl enable --now caddy"
 else
-    echo "   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https"
-    echo "   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg"
-    echo "   echo 'deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main' | sudo tee /etc/apt/sources.list.d/caddy-stable.list"
-    echo "   sudo apt update && sudo apt install caddy"
+    echo "   $SUDO apt install -y debian-keyring debian-archive-keyring apt-transport-https"
+    echo "   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | $SUDO gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg"
+    echo "   echo 'deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main' | $SUDO tee /etc/apt/sources.list.d/caddy-stable.list"
+    echo "   $SUDO apt update && $SUDO apt install caddy"
 fi
 echo "   Edit /etc/caddy/Caddyfile: chat.yourdomain.com { reverse_proxy localhost:5000 }"
 echo ""
@@ -112,14 +168,16 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "🛠️  Useful Commands:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "View logs:         sudo journalctl -u rpi-chat -f"
-echo "Restart:           sudo systemctl restart rpi-chat"
-echo "Stop:              sudo systemctl stop rpi-chat"
-echo "Status:            sudo systemctl status rpi-chat"
-echo "Disable autostart: sudo systemctl disable rpi-chat"
+echo "View logs:         $SUDO journalctl -u rpi-chat -f"
+echo "Restart:           $SUDO systemctl restart rpi-chat"
+echo "Stop:              $SUDO systemctl stop rpi-chat"
+echo "Status:            $SUDO systemctl status rpi-chat"
+echo "Disable autostart: $SUDO systemctl disable rpi-chat"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "🎉 First time setup: Visit http://$LOCAL_IP:5000/setup"
 echo "   (Only accessible from this device for security)"
+echo ""
+echo "🔄 Auto-start enabled: Service will start automatically on boot"
 echo ""

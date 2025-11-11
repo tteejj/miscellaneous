@@ -20,39 +20,69 @@ detect_distro() {
 
 detect_distro
 
+# Determine if we need sudo
+if [ "$EUID" -eq 0 ]; then
+    SUDO=""
+else
+    SUDO="sudo"
+fi
+
 # Check if Tailscale is installed
 if ! command -v tailscale &> /dev/null; then
     echo "📦 Installing Tailscale..."
 
     if [[ "$DISTRO" == "void" ]]; then
         echo "📋 Detected: Void Linux"
-        sudo xbps-install -y tailscale
+        $SUDO xbps-install -y tailscale
         # Enable and start tailscaled service on Void
-        sudo ln -sf /etc/sv/tailscaled /var/service/
-        sudo sv up tailscaled
+        $SUDO ln -sf /etc/sv/tailscaled /var/service/
+        $SUDO sv up tailscaled
+    elif [[ "$DISTRO" == "dietpi" ]]; then
+        echo "📋 Detected: DietPi"
+        $SUDO apt-get update
+        $SUDO apt-get install -y tailscale
+        # Enable and start tailscaled service
+        $SUDO systemctl enable --now tailscaled
     else
         echo "📋 Detected: $DISTRO (using official installer)"
         curl -fsSL https://tailscale.com/install.sh | sh
+        # Ensure service is enabled on systemd systems
+        if command -v systemctl &> /dev/null; then
+            $SUDO systemctl enable --now tailscaled
+        fi
     fi
 
     echo "✅ Tailscale installed"
 else
     echo "✅ Tailscale already installed: $(tailscale version)"
+
+    # Ensure service is enabled for auto-start
+    if [[ "$DISTRO" == "void" ]]; then
+        if [ ! -L /var/service/tailscaled ]; then
+            $SUDO ln -sf /etc/sv/tailscaled /var/service/
+            $SUDO sv up tailscaled
+        fi
+    elif command -v systemctl &> /dev/null; then
+        if ! $SUDO systemctl is-enabled --quiet tailscaled 2>/dev/null; then
+            echo "🔧 Enabling Tailscale auto-start..."
+            $SUDO systemctl enable --now tailscaled
+        fi
+    fi
 fi
 
 # Check if already logged in
-if ! sudo tailscale status &> /dev/null; then
+if ! $SUDO tailscale status &> /dev/null; then
     echo ""
     echo "🔑 Please authenticate with Tailscale..."
     echo "   A browser window will open to complete authentication"
     echo ""
-    sudo tailscale up
+    $SUDO tailscale up
 else
     echo "✅ Already logged into Tailscale"
 fi
 
 # Get Tailscale hostname
-TAILSCALE_HOSTNAME=$(sudo tailscale status --json | grep -o '"DNSName":"[^"]*"' | cut -d'"' -f4 | sed 's/\.$//')
+TAILSCALE_HOSTNAME=$($SUDO tailscale status --json | grep -o '"DNSName":"[^"]*"' | cut -d'"' -f4 | sed 's/\.$//')
 
 if [ -z "$TAILSCALE_HOSTNAME" ]; then
     echo "❌ Could not get Tailscale hostname"
@@ -82,7 +112,7 @@ echo ""
 if [ "$MODE" = "2" ]; then
     echo ""
     echo "🌐 Enabling Tailscale Funnel (public HTTPS)..."
-    sudo tailscale funnel --bg 5000 on
+    $SUDO tailscale funnel --bg 5000 on
 
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -98,7 +128,7 @@ if [ "$MODE" = "2" ]; then
     echo "   - Consider setting strong passwords"
     echo ""
     echo "To disable public access:"
-    echo "   sudo tailscale funnel --bg 5000 off"
+    echo "   $SUDO tailscale funnel --bg 5000 off"
     echo ""
 else
     echo ""
@@ -115,13 +145,27 @@ else
     echo "   https://tailscale.com/download"
     echo ""
     echo "To enable public access later:"
-    echo "   sudo tailscale funnel --bg 5000 on"
+    echo "   $SUDO tailscale funnel --bg 5000 on"
     echo ""
 fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔄 Auto-start Status:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+if [[ "$DISTRO" == "void" ]]; then
+    if [ -L /var/service/tailscaled ]; then
+        echo "✅ Tailscale will auto-start on boot (runit)"
+    fi
+elif command -v systemctl &> /dev/null; then
+    if $SUDO systemctl is-enabled --quiet tailscaled 2>/dev/null; then
+        echo "✅ Tailscale will auto-start on boot (systemd)"
+    fi
+fi
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📋 Tailscale Status:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-sudo tailscale status
+$SUDO tailscale status
 echo ""

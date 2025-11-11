@@ -6,7 +6,7 @@
 
 DietPi comes with git already installed. If not:
 ```bash
-sudo apt-get update && sudo apt-get install -y git
+apt-get update && apt-get install -y git
 ```
 
 ## Installation Steps
@@ -24,6 +24,7 @@ cd miscellaneous
 ```bash
 ./install.sh
 ```
+**Note:** DietPi defaults to root user - the installer detects this and works perfectly!
 
 #### Option B: Container Version (Podman + Tailscale)
 ```bash
@@ -31,6 +32,7 @@ cd container-version
 ./install-container.sh
 ./setup-tailscale.sh  # Optional: Add HTTPS
 ```
+**Note:** Also works as root on DietPi!
 
 ### 3. Access Your Chat Server
 
@@ -59,19 +61,32 @@ DietPi's minimal footprint leaves plenty of resources for the chat server!
 
 ## Post-Installation
 
+### ✅ Auto-Start Enabled
+
+Both installers automatically configure services to start on boot:
+- **Standard version:** `rpi-chat.service`
+- **Container version:** `rpi-chat-podman.service`
+- **Tailscale (if installed):** `tailscaled.service`
+
+Just reboot and everything starts automatically! 🎉
+
 ### Check Service Status
 ```bash
-sudo systemctl status rpi-chat
+systemctl status rpi-chat         # Standard version
+systemctl status rpi-chat-podman  # Container version
+systemctl status tailscaled       # Tailscale
 ```
 
 ### View Logs
 ```bash
-sudo journalctl -u rpi-chat -f
+journalctl -u rpi-chat -f         # Standard version
+journalctl -u rpi-chat-podman -f  # Container version
 ```
 
 ### Restart Service
 ```bash
-sudo systemctl restart rpi-chat
+systemctl restart rpi-chat         # Standard version
+systemctl restart rpi-chat-podman  # Container version
 ```
 
 ## Optional: Add HTTPS

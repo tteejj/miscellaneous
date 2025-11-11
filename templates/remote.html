@@ -247,6 +247,7 @@
     <div class="header">
         <h1>Samsung TV Remote</h1>
         <p>Model: U8000F 50"</p>
+        <p id="status" style="font-size: 0.8rem; color: #ff6b6b;">⚠️ Loading JavaScript...</p>
     </div>
 
     <div class="remote-container">
@@ -333,15 +334,14 @@
     <div class="feedback" id="feedback"></div>
 
     <script>
-        // Test if script is loading
-        console.log('Remote control script loaded');
+        console.log('[REMOTE] Script tag executing');
 
         async function sendCommand(command) {
-            console.log('sendCommand called with:', command);
+            console.log('[REMOTE] sendCommand called with:', command);
 
             const feedbackDiv = document.getElementById('feedback');
             if (!feedbackDiv) {
-                console.error('Feedback div not found!');
+                console.error('[REMOTE] Feedback div not found!');
                 return;
             }
 
@@ -360,29 +360,45 @@
                 });
 
                 if (response.ok) {
-                    console.log('Command sent successfully:', command);
+                    console.log('[REMOTE] Command sent successfully:', command);
                 } else {
-                    console.error('Failed to send command, status:', response.status);
+                    console.error('[REMOTE] Failed to send command, status:', response.status);
                 }
             } catch (error) {
-                console.error('Error sending command:', error);
+                console.error('[REMOTE] Error sending command:', error);
             }
         }
 
-        // Use event delegation for all buttons
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOM loaded, attaching event listeners');
+        function initializeRemote() {
+            console.log('[REMOTE] Initializing remote control');
+
+            const statusEl = document.getElementById('status');
+            if (statusEl) {
+                statusEl.textContent = '✓ Ready';
+                statusEl.style.color = '#10b981';
+            }
 
             // Add click handlers to all buttons with data-command attribute
             const buttons = document.querySelectorAll('[data-command]');
-            console.log('Found', buttons.length, 'buttons');
+            console.log('[REMOTE] Found', buttons.length, 'buttons');
+
+            if (buttons.length === 0) {
+                console.error('[REMOTE] NO BUTTONS FOUND! Check HTML structure');
+                if (statusEl) {
+                    statusEl.textContent = '❌ No buttons found!';
+                    statusEl.style.color = '#ff6b6b';
+                }
+                return;
+            }
 
             buttons.forEach((button, index) => {
                 button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     const command = e.currentTarget.getAttribute('data-command');
-                    console.log('Button clicked:', index, 'command:', command);
+                    console.log('[REMOTE] Button clicked:', index, 'command:', command);
                     sendCommand(command);
-                });
+                }, { passive: false });
             });
 
             // Add keyboard shortcuts
@@ -408,7 +424,21 @@
                 }
             });
 
-            console.log('Remote control ready. All event listeners attached.');
+            console.log('[REMOTE] All event listeners attached successfully');
+        }
+
+        // Try multiple initialization methods to ensure compatibility
+        if (document.readyState === 'loading') {
+            console.log('[REMOTE] Document still loading, waiting for DOMContentLoaded');
+            document.addEventListener('DOMContentLoaded', initializeRemote);
+        } else {
+            console.log('[REMOTE] Document already loaded, initializing immediately');
+            initializeRemote();
+        }
+
+        // Backup initialization on window.onload
+        window.addEventListener('load', () => {
+            console.log('[REMOTE] Window loaded event fired');
         });
     </script>
 </body>

@@ -250,81 +250,81 @@
     </div>
 
     <div class="remote-container">
-        <button class="btn btn-power" onclick="sendCommand('POWER')">⏻</button>
+        <button class="btn btn-power" data-command="POWER">⏻</button>
 
         <div class="streaming-apps">
-            <button class="btn btn-app btn-netflix" onclick="sendCommand('NETFLIX')">
+            <button class="btn btn-app btn-netflix" data-command="NETFLIX">
                 <span style="font-size: 1.2rem;">N</span>
                 <span>Netflix</span>
             </button>
-            <button class="btn btn-app btn-disney" onclick="sendCommand('DISNEY')">
+            <button class="btn btn-app btn-disney" data-command="DISNEY">
                 <span style="font-size: 1.2rem;">D+</span>
                 <span>Disney+</span>
             </button>
-            <button class="btn btn-app btn-prime" onclick="sendCommand('PRIME')">
+            <button class="btn btn-app btn-prime" data-command="PRIME">
                 <span style="font-size: 1.2rem;">P</span>
                 <span>Prime</span>
             </button>
-            <button class="btn btn-app btn-youtube" onclick="sendCommand('YOUTUBE')">
+            <button class="btn btn-app btn-youtube" data-command="YOUTUBE">
                 <span style="font-size: 1.2rem;">▶</span>
                 <span>YouTube</span>
             </button>
         </div>
 
         <div class="quick-access">
-            <button class="btn btn-quick" onclick="sendCommand('HOME')">🏠 Home</button>
-            <button class="btn btn-quick" onclick="sendCommand('SOURCE')">📺 Source</button>
-            <button class="btn btn-quick" onclick="sendCommand('SETTINGS')">⚙️ Settings</button>
+            <button class="btn btn-quick" data-command="HOME">🏠 Home</button>
+            <button class="btn btn-quick" data-command="SOURCE">📺 Source</button>
+            <button class="btn btn-quick" data-command="SETTINGS">⚙️ Settings</button>
         </div>
 
         <div class="dpad-section">
-            <button class="btn btn-dpad btn-up" onclick="sendCommand('UP')">▲</button>
-            <button class="btn btn-dpad btn-left" onclick="sendCommand('LEFT')">◀</button>
-            <button class="btn btn-dpad btn-ok" onclick="sendCommand('OK')">OK</button>
-            <button class="btn btn-dpad btn-right" onclick="sendCommand('RIGHT')">▶</button>
-            <button class="btn btn-dpad btn-down" onclick="sendCommand('DOWN')">▼</button>
+            <button class="btn btn-dpad btn-up" data-command="UP">▲</button>
+            <button class="btn btn-dpad btn-left" data-command="LEFT">◀</button>
+            <button class="btn btn-dpad btn-ok" data-command="OK">OK</button>
+            <button class="btn btn-dpad btn-right" data-command="RIGHT">▶</button>
+            <button class="btn btn-dpad btn-down" data-command="DOWN">▼</button>
         </div>
 
         <div class="volume-section">
             <div class="volume-controls">
-                <button class="btn btn-control" onclick="sendCommand('VOL_UP')">Vol +</button>
-                <button class="btn btn-control" onclick="sendCommand('VOL_DOWN')">Vol −</button>
-                <button class="btn btn-control" onclick="sendCommand('MUTE')">🔇 Mute</button>
+                <button class="btn btn-control" data-command="VOL_UP">Vol +</button>
+                <button class="btn btn-control" data-command="VOL_DOWN">Vol −</button>
+                <button class="btn btn-control" data-command="MUTE">🔇 Mute</button>
             </div>
             <div class="channel-controls">
-                <button class="btn btn-control" onclick="sendCommand('CH_UP')">CH +</button>
-                <button class="btn btn-control" onclick="sendCommand('CH_DOWN')">CH −</button>
-                <button class="btn btn-control" onclick="sendCommand('GUIDE')">📋 Guide</button>
+                <button class="btn btn-control" data-command="CH_UP">CH +</button>
+                <button class="btn btn-control" data-command="CH_DOWN">CH −</button>
+                <button class="btn btn-control" data-command="GUIDE">📋 Guide</button>
             </div>
         </div>
 
         <div class="numpad">
-            <button class="btn btn-num" onclick="sendCommand('1')">1</button>
-            <button class="btn btn-num" onclick="sendCommand('2')">2</button>
-            <button class="btn btn-num" onclick="sendCommand('3')">3</button>
-            <button class="btn btn-num" onclick="sendCommand('4')">4</button>
-            <button class="btn btn-num" onclick="sendCommand('5')">5</button>
-            <button class="btn btn-num" onclick="sendCommand('6')">6</button>
-            <button class="btn btn-num" onclick="sendCommand('7')">7</button>
-            <button class="btn btn-num" onclick="sendCommand('8')">8</button>
-            <button class="btn btn-num" onclick="sendCommand('9')">9</button>
-            <button class="btn btn-num" onclick="sendCommand('PREV')">◀◀</button>
-            <button class="btn btn-num" onclick="sendCommand('0')">0</button>
-            <button class="btn btn-num" onclick="sendCommand('NEXT')">▶▶</button>
+            <button class="btn btn-num" data-command="1">1</button>
+            <button class="btn btn-num" data-command="2">2</button>
+            <button class="btn btn-num" data-command="3">3</button>
+            <button class="btn btn-num" data-command="4">4</button>
+            <button class="btn btn-num" data-command="5">5</button>
+            <button class="btn btn-num" data-command="6">6</button>
+            <button class="btn btn-num" data-command="7">7</button>
+            <button class="btn btn-num" data-command="8">8</button>
+            <button class="btn btn-num" data-command="9">9</button>
+            <button class="btn btn-num" data-command="PREV">◀◀</button>
+            <button class="btn btn-num" data-command="0">0</button>
+            <button class="btn btn-num" data-command="NEXT">▶▶</button>
         </div>
 
         <div class="playback-controls">
-            <button class="btn btn-playback" onclick="sendCommand('REWIND')">⏪</button>
-            <button class="btn btn-playback" onclick="sendCommand('PLAY')">▶️</button>
-            <button class="btn btn-playback" onclick="sendCommand('PAUSE')">⏸️</button>
-            <button class="btn btn-playback" onclick="sendCommand('STOP')">⏹️</button>
-            <button class="btn btn-playback" onclick="sendCommand('FF')">⏩</button>
+            <button class="btn btn-playback" data-command="REWIND">⏪</button>
+            <button class="btn btn-playback" data-command="PLAY">▶️</button>
+            <button class="btn btn-playback" data-command="PAUSE">⏸️</button>
+            <button class="btn btn-playback" data-command="STOP">⏹️</button>
+            <button class="btn btn-playback" data-command="FF">⏩</button>
         </div>
 
         <div class="bottom-controls">
-            <button class="btn btn-bottom" onclick="sendCommand('BACK')">← Back</button>
-            <button class="btn btn-bottom" onclick="sendCommand('INFO')">ℹ️ Info</button>
-            <button class="btn btn-bottom" onclick="sendCommand('EXIT')">✕ Exit</button>
+            <button class="btn btn-bottom" data-command="BACK">← Back</button>
+            <button class="btn btn-bottom" data-command="INFO">ℹ️ Info</button>
+            <button class="btn btn-bottom" data-command="EXIT">✕ Exit</button>
         </div>
     </div>
 
@@ -369,35 +369,47 @@
             }
         }
 
-        // Add keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            const keyMap = {
-                'ArrowUp': 'UP',
-                'ArrowDown': 'DOWN',
-                'ArrowLeft': 'LEFT',
-                'ArrowRight': 'RIGHT',
-                'Enter': 'OK',
-                ' ': 'PLAY',
-                'Escape': 'BACK',
-                'p': 'POWER',
-                'h': 'HOME',
-                'm': 'MUTE'
-            };
+        // Use event delegation for all buttons
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, attaching event listeners');
 
-            if (keyMap[e.key]) {
-                e.preventDefault();
-                sendCommand(keyMap[e.key]);
-            } else if (e.key >= '0' && e.key <= '9') {
-                sendCommand(e.key);
-            }
+            // Add click handlers to all buttons with data-command attribute
+            const buttons = document.querySelectorAll('[data-command]');
+            console.log('Found', buttons.length, 'buttons');
+
+            buttons.forEach((button, index) => {
+                button.addEventListener('click', (e) => {
+                    const command = e.currentTarget.getAttribute('data-command');
+                    console.log('Button clicked:', index, 'command:', command);
+                    sendCommand(command);
+                });
+            });
+
+            // Add keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                const keyMap = {
+                    'ArrowUp': 'UP',
+                    'ArrowDown': 'DOWN',
+                    'ArrowLeft': 'LEFT',
+                    'ArrowRight': 'RIGHT',
+                    'Enter': 'OK',
+                    ' ': 'PLAY',
+                    'Escape': 'BACK',
+                    'p': 'POWER',
+                    'h': 'HOME',
+                    'm': 'MUTE'
+                };
+
+                if (keyMap[e.key]) {
+                    e.preventDefault();
+                    sendCommand(keyMap[e.key]);
+                } else if (e.key >= '0' && e.key <= '9') {
+                    sendCommand(e.key);
+                }
+            });
+
+            console.log('Remote control ready. All event listeners attached.');
         });
-
-        // Test button click
-        window.testClick = function() {
-            alert('Buttons are clickable!');
-        };
-
-        console.log('Remote control ready. Try clicking a button or check console for errors.');
     </script>
 </body>
 </html>

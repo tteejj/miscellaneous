@@ -1,0 +1,30 @@
+[Unit]
+Description=RPi Chat Server (Podman Container)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Restart=always
+RestartSec=10
+TimeoutStartSec=0
+
+# Stop and remove old container
+ExecStartPre=-/usr/bin/podman stop rpi-chat
+ExecStartPre=-/usr/bin/podman rm rpi-chat
+
+# Start container
+ExecStart=/usr/bin/podman run \
+    --name rpi-chat \
+    --rm \
+    -p 5000:5000 \
+    -v %h/rpi-chat-data/uploads:/app/uploads:Z \
+    -v %h/rpi-chat-data/chat.db:/app/chat.db:Z \
+    localhost/rpi-chat:latest
+
+# Stop container
+ExecStop=/usr/bin/podman stop -t 10 rpi-chat
+
+[Install]
+WantedBy=multi-user.target

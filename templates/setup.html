@@ -151,9 +151,9 @@
             event.preventDefault();
             hideError();
 
-            var username = document.getElementById('username').value.replace(/^\s+|\s+$/g, '');
-            var password = document.getElementById('password').value;
-            var passwordConfirm = document.getElementById('passwordConfirm').value;
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const passwordConfirm = document.getElementById('passwordConfirm').value;
 
             if (!username) {
                 showError('Username is required');
@@ -170,9 +170,14 @@
                 return;
             }
 
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/setup', true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
+            try {
+                const response = await fetch('/api/setup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
 
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {

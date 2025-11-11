@@ -183,8 +183,7 @@
     </div>
 
     <script>
-        var pathParts = window.location.pathname.split('/');
-        var channelId = parseInt(pathParts[pathParts.length - 1]);
+        const channelId = parseInt(window.location.pathname.split('/').pop());
 
         function formatFileSize(bytes) {
             if (bytes < 1024) return bytes + ' B';
@@ -193,7 +192,7 @@
         }
 
         function formatDate(timestamp) {
-            var date = new Date(timestamp);
+            const date = new Date(timestamp);
             return date.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -201,64 +200,57 @@
             });
         }
 
-        function loadGallery() {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', '/api/images/' + channelId, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
-                    try {
-                        var images = JSON.parse(xhr.responseText);
-                        var loading = document.getElementById('loading');
-                        var gallery = document.getElementById('galleryGrid');
-                        var emptyState = document.getElementById('emptyState');
+        async function loadGallery() {
+            try {
+                const response = await fetch(`/api/images/${channelId}`);
+                const images = await response.json();
 
-                        loading.style.display = 'none';
+                const loading = document.getElementById('loading');
+                const gallery = document.getElementById('galleryGrid');
+                const emptyState = document.getElementById('emptyState');
 
-                        if (images.length === 0) {
-                            emptyState.style.display = 'block';
-                            return;
-                        }
+                loading.style.display = 'none';
 
-                        gallery.style.display = 'grid';
-                        var html = '';
-                        for (var i = 0; i < images.length; i++) {
-                            var img = images[i];
-                            html += '<div class="gallery-item" onclick="showFullImage(\'/uploads/' + img.filename + '\')">' +
-                                '<img src="/uploads/thumbnails/' + img.thumbnail_filename + '" alt="Photo by ' + img.username + '">' +
-                                '<div class="gallery-item-info">' +
-                                '<div class="gallery-item-user">' + escapeHtml(img.username) + '</div>' +
-                                '<div class="gallery-item-date">' + formatDate(img.timestamp) + '</div>' +
-                                '<div class="gallery-item-size">' + formatFileSize(img.file_size) + '</div>' +
-                                '</div></div>';
-                        }
-                        gallery.innerHTML = html;
-                    } catch (e) {
-                        console.error('Error loading gallery:', e);
-                        document.getElementById('loading').textContent = 'Failed to load gallery';
-                    }
+                if (images.length === 0) {
+                    emptyState.style.display = 'block';
+                    return;
                 }
-            };
-            xhr.send();
+
+                gallery.style.display = 'grid';
+                gallery.innerHTML = images.map(img => `
+                    <div class="gallery-item" onclick="showFullImage('/uploads/${img.filename}')">
+                        <img src="/uploads/thumbnails/${img.thumbnail_filename}"
+                             alt="Photo by ${img.username}">
+                        <div class="gallery-item-info">
+                            <div class="gallery-item-user">${escapeHtml(img.username)}</div>
+                            <div class="gallery-item-date">${formatDate(img.timestamp)}</div>
+                            <div class="gallery-item-size">${formatFileSize(img.file_size)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading gallery:', error);
+                document.getElementById('loading').textContent = 'Failed to load gallery';
+            }
         }
 
         function escapeHtml(text) {
-            var div = document.createElement('div');
+            const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
 
         function showFullImage(imagePath) {
-            if (event) event.stopPropagation();
+            event.stopPropagation();
             document.getElementById('modalImage').src = imagePath;
-            var modal = document.getElementById('imageModal');
-            modal.className = modal.className + ' show';
+            document.getElementById('imageModal').classList.add('show');
         }
 
         function closeModal() {
-            var modal = document.getElementById('imageModal');
-            modal.className = modal.className.replace(' show', '').replace('show', '');
+            document.getElementById('imageModal').classList.remove('show');
         }
 
+        // Load gallery on page load
         loadGallery();
     </script>
 </body>

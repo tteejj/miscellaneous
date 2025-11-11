@@ -60,6 +60,12 @@ if [[ "$DISTRO" == "void" ]]; then
 elif [[ "$DISTRO" == "debian" ]] || [[ "$DISTRO" == "ubuntu" ]] || [[ "$DISTRO" == "raspbian" ]] || [[ "$DISTRO" == "dietpi" ]]; then
     echo "📦 Installing Podman (Debian/Ubuntu/DietPi)..."
     $SUDO apt-get update
+
+    # Install nftables first (required by Podman for networking)
+    echo "📦 Installing nftables (required for Podman networking)..."
+    $SUDO apt-get install -y nftables
+
+    # Install Podman
     $SUDO apt-get install -y podman
 
 else

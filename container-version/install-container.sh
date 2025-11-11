@@ -19,11 +19,16 @@ detect_distro() {
     fi
 }
 
+# Check if DietPi
+is_dietpi() {
+    [ -f /boot/dietpi/.installed ] || [ -d /boot/dietpi ] || grep -qi "dietpi" /etc/os-release 2>/dev/null
+}
+
 detect_distro
 
 # Check if running as root (allow on DietPi, warn on others)
 if [ "$EUID" -eq 0 ]; then
-    if [[ "$DISTRO" == "dietpi" ]]; then
+    if is_dietpi; then
         echo "📋 Running as root on DietPi (default setup)"
         SUDO=""
         INSTALL_USER="root"

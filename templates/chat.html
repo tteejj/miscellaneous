@@ -2003,6 +2003,10 @@
             }
         }
 
+        function closeSearch() {
+            document.getElementById('searchModal').classList.remove('show');
+        }
+
         let searchTimeout;
         async function performSearch() {
             clearTimeout(searchTimeout);

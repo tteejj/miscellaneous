@@ -28,7 +28,7 @@ COPY templates/ templates/
 RUN adduser -D -u 1000 chatuser
 
 # Create data directory and set ownership
-RUN mkdir -p /app/data/uploads/thumbnails /app/data/uploads/files && \
+RUN mkdir -p /app/data/uploads/thumbnails /app/data/uploads/files /app/data/uploads/avatars && \
     chown -R chatuser:chatuser /app /app/data
 
 # Switch to non-root user

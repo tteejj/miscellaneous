@@ -4,10 +4,37 @@ set -e
 echo "🔐 Setting up Tailscale HTTPS for RPi Chat"
 echo ""
 
+# Detect distribution
+detect_distro() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DISTRO=$ID
+    elif command -v xbps-install &> /dev/null; then
+        DISTRO="void"
+    elif command -v apt-get &> /dev/null; then
+        DISTRO="debian"
+    else
+        DISTRO="unknown"
+    fi
+}
+
+detect_distro
+
 # Check if Tailscale is installed
 if ! command -v tailscale &> /dev/null; then
     echo "📦 Installing Tailscale..."
-    curl -fsSL https://tailscale.com/install.sh | sh
+
+    if [[ "$DISTRO" == "void" ]]; then
+        echo "📋 Detected: Void Linux"
+        sudo xbps-install -y tailscale
+        # Enable and start tailscaled service on Void
+        sudo ln -sf /etc/sv/tailscaled /var/service/
+        sudo sv up tailscaled
+    else
+        echo "📋 Detected: $DISTRO (using official installer)"
+        curl -fsSL https://tailscale.com/install.sh | sh
+    fi
+
     echo "✅ Tailscale installed"
 else
     echo "✅ Tailscale already installed: $(tailscale version)"

@@ -1064,6 +1064,9 @@
             <div class="modal-header">Search Messages</div>
             <input type="text" class="search-input" id="searchInput" placeholder="Search..." onkeyup="performSearch()">
             <div class="search-results" id="searchResults"></div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                <button class="btn-send" style="flex: 1; background: #6b7280;" onclick="closeSearch()">Close</button>
+            </div>
         </div>
     </div>
 
@@ -1255,6 +1258,9 @@
 
                 if (channels.length > 0 && !currentChannelId) {
                     switchChannel(channels[0].id, channels[0].display_name);
+                } else if (channels.length > 0 && currentChannelId) {
+                    // Update gallery link even if channel is already selected
+                    document.getElementById('galleryBtn').href = `/gallery/${currentChannelId}`;
                 }
             } catch (error) {
                 console.error('Error loading channels:', error);
@@ -2293,6 +2299,14 @@
                 loadActiveUsers();
             }
         }, 30000);
+
+        // Add gallery button safety check
+        document.getElementById('galleryBtn').addEventListener('click', (e) => {
+            if (!currentChannelId || e.currentTarget.getAttribute('href') === '#') {
+                e.preventDefault();
+                alert('Please select a channel first');
+            }
+        });
 
         // Initialize
         checkAdmin();

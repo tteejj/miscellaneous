@@ -21,10 +21,18 @@ def init_db():
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             avatar_color TEXT DEFAULT '#667eea',
+            avatar_url TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             active BOOLEAN DEFAULT 1
         )
     ''')
+
+    # Migration: Add avatar_url column if it doesn't exist
+    cursor.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'avatar_url' not in columns:
+        cursor.execute('ALTER TABLE users ADD COLUMN avatar_url TEXT')
+        print("✓ Added avatar_url column to users table")
 
     # Channels table
     cursor.execute('''

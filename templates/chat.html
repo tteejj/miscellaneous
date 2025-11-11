@@ -927,6 +927,7 @@
         <div class="header-right">
             <button class="search-btn" onclick="openSearch()">🔍</button>
             <a href="#" class="gallery-btn" id="galleryBtn">📷</a>
+            <a href="/profile" class="gallery-btn">👤</a>
             <a href="/admin" class="admin-btn" id="adminBtn" style="display: none;">⚙️</a>
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
@@ -1311,18 +1312,12 @@
                 const response = await fetch(`/api/messages/${currentChannelId}`);
                 const data = await response.json();
                 const messages = data.messages || [];
+                const messagesDiv = document.getElementById('messages');
 
-                        if (messages.length === 0) {
-                            messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
-                            return;
-                        }
-
-                        var newMessages = [];
-                        for (var i = 0; i < messages.length; i++) {
-                            if (messages[i].id > lastMessageId) {
-                                newMessages.push(messages[i]);
-                            }
-                        }
+                if (messages.length === 0) {
+                    messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+                    return;
+                }
 
                 // Check if this is the pictures channel
                 const channelName = document.getElementById('currentChannelName').textContent.toLowerCase();
@@ -1507,11 +1502,14 @@
             // Avatar
             const avatarColor = msg.avatar_color || '#667eea';
             const initials = getUserInitials(msg.username);
+            const avatarHTML = msg.avatar_url
+                ? `<img src="/uploads/avatars/${msg.avatar_url}" alt="${escapeHtml(msg.username)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+                : initials;
 
             return `
                 <div class="message" id="msg-${msg.id}">
                     <div class="message-avatar" style="background: ${avatarColor};">
-                        ${initials}
+                        ${avatarHTML}
                     </div>
                     <div class="message-body">
                         <div class="message-header">

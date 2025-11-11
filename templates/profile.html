@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Settings - RPi Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f0f2f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        .card h2 {
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+
+        .avatar-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .avatar-preview {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: #667eea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+            font-weight: 600;
+            overflow: hidden;
+        }
+
+        .avatar-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .upload-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+
+        .upload-btn:hover {
+            background: #5568d3;
+        }
+
+        .info-item {
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .info-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+
+        .info-value {
+            font-size: 1.1rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Profile Settings</h1>
+        <a href="/" class="back-btn">← Back to Chat</a>
+    </div>
+
+    <div class="container">
+        <div class="message" id="message"></div>
+
+        <div class="card">
+            <h2>Profile Picture</h2>
+            <div class="avatar-section">
+                <div class="avatar-preview" id="avatarPreview">
+                    <span id="avatarInitials"></span>
+                </div>
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    Upload Avatar
+                </button>
+                <input type="file" id="fileInput" accept="image/*" onchange="uploadAvatar()">
+                <p style="color: #666; font-size: 0.9rem;">PNG, JPG, or GIF • Max 5MB • Will be resized to 200x200</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Account Information</h2>
+            <div class="info-item">
+                <div class="info-label">Username</div>
+                <div class="info-value" id="username"></div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">User ID</div>
+                <div class="info-value" id="userId"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+
+        async function loadProfile() {
+            try {
+                const response = await fetch('/api/profile');
+                const data = await response.json();
+                currentUser = data;
+
+                document.getElementById('username').textContent = data.username;
+                document.getElementById('userId').textContent = data.id;
+
+                if (data.avatar_url) {
+                    document.getElementById('avatarPreview').innerHTML =
+                        `<img src="/uploads/avatars/${data.avatar_url}" alt="Avatar">`;
+                } else {
+                    const initials = getUserInitials(data.username);
+                    const avatarPreview = document.getElementById('avatarPreview');
+                    avatarPreview.style.background = data.avatar_color || '#667eea';
+                    document.getElementById('avatarInitials').textContent = initials;
+                }
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                showMessage('Failed to load profile', 'error');
+            }
+        }
+
+        function getUserInitials(username) {
+            if (!username) return '?';
+            const parts = username.split(/[\s_-]+/);
+            if (parts.length >= 2) {
+                return (parts[0][0] + parts[1][0]).toUpperCase();
+            }
+            return username.substring(0, 2).toUpperCase();
+        }
+
+        async function uploadAvatar() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                showMessage('Avatar too large. Maximum size is 5MB.', 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/profile/avatar', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('Avatar uploaded successfully!', 'success');
+                    // Reload to show new avatar
+                    setTimeout(() => loadProfile(), 500);
+                } else {
+                    showMessage(data.error || 'Failed to upload avatar', 'error');
+                }
+            } catch (error) {
+                console.error('Error uploading avatar:', error);
+                showMessage('Failed to upload avatar', 'error');
+            }
+
+            fileInput.value = '';
+        }
+
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Load profile on page load
+        loadProfile();
+    </script>
+</body>
+</html>

@@ -28,6 +28,7 @@ app.secret_key = secrets.token_hex(32)
 UPLOAD_FOLDER = 'uploads'
 THUMBNAIL_FOLDER = 'uploads/thumbnails'
 FILES_FOLDER = 'uploads/files'
+AVATARS_FOLDER = 'uploads/avatars'
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 ALLOWED_FILE_EXTENSIONS = {'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'zip', 'mp3', 'mp4', 'wav'}
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -41,6 +42,7 @@ RATE_LIMIT_WINDOW = 60  # seconds
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(THUMBNAIL_FOLDER, exist_ok=True)
 os.makedirs(FILES_FOLDER, exist_ok=True)
+os.makedirs(AVATARS_FOLDER, exist_ok=True)
 
 # SSE message queues for each user
 message_queues = {}
@@ -326,6 +328,15 @@ def admin_panel():
         return "Access denied. Admin only.", 403
 
     return render_template('admin.html')
+
+
+@app.route('/profile')
+def profile_page():
+    """User profile settings page"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    return render_template('profile.html')
 
 
 @app.route('/gallery/<int:channel_id>')
@@ -639,10 +650,10 @@ def get_messages(channel_id):
         else:
             break
 
-    # Get messages with user info including avatar color
+    # Get messages with user info including avatar color and avatar URL
     cursor.execute('''
         SELECT m.id, m.message_type, m.content, m.metadata, m.timestamp, m.user_id,
-               u.username, u.avatar_color,
+               u.username, u.avatar_color, u.avatar_url,
                CASE WHEN me.message_id IS NOT NULL THEN 1 ELSE 0 END as edited,
                CASE WHEN pm.message_id IS NOT NULL THEN 1 ELSE 0 END as pinned
         FROM messages m
@@ -1003,6 +1014,107 @@ def check_admin():
         'is_admin': is_admin(session['user_id']),
         'username': user_info['username'] if user_info else None
     })
+
+
+@app.route('/api/profile/avatar', methods=['POST'])
+def upload_avatar():
+    """Upload user avatar"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'File type not allowed. Use PNG, JPG, or GIF'}), 400
+
+    # Check file size (max 5MB for avatars)
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+
+    if file_size > 5 * 1024 * 1024:
+        return jsonify({'error': 'Avatar too large (max 5MB)'}), 400
+
+    user_id = session['user_id']
+
+    # Delete old avatar if exists
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT avatar_url FROM users WHERE id = ?', (user_id,))
+    old_avatar = cursor.fetchone()
+    if old_avatar and old_avatar['avatar_url']:
+        old_path = os.path.join(AVATARS_FOLDER, old_avatar['avatar_url'])
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    # Generate unique filename
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    random_str = secrets.token_hex(4)
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    filename = f"avatar_{user_id}_{timestamp}_{random_str}.{ext}"
+    filepath = os.path.join(AVATARS_FOLDER, filename)
+
+    # Save and process avatar
+    file.save(filepath)
+
+    try:
+        with Image.open(filepath) as img:
+            # Convert to RGB if necessary
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            # Resize to 200x200 square avatar
+            img.thumbnail((200, 200), Image.Resampling.LANCZOS)
+
+            # Create a square image
+            width, height = img.size
+            if width != height:
+                size = min(width, height)
+                left = (width - size) // 2
+                top = (height - size) // 2
+                img = img.crop((left, top, left + size, top + size))
+                img = img.resize((200, 200), Image.Resampling.LANCZOS)
+
+            # Save optimized avatar
+            img.save(filepath, quality=90, optimize=True)
+    except Exception as e:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        return jsonify({'error': f'Avatar processing failed: {str(e)}'}), 500
+
+    # Update database
+    cursor.execute('UPDATE users SET avatar_url = ? WHERE id = ?', (filename, user_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'avatar_url': f'/uploads/avatars/{filename}'}), 200
+
+
+@app.route('/api/profile', methods=['GET'])
+def get_profile():
+    """Get current user's profile"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, username, avatar_url, avatar_color FROM users WHERE id = ?', (session['user_id'],))
+    user = dict(cursor.fetchone())
+    conn.close()
+
+    return jsonify(user), 200
+
+
+@app.route('/uploads/avatars/<filename>')
+def serve_avatar(filename):
+    """Serve avatar files"""
+    return send_from_directory(AVATARS_FOLDER, filename)
 
 
 @app.route('/api/messages/<int:message_id>/react', methods=['POST'])

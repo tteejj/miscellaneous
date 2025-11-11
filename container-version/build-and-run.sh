@@ -1,12 +1,19 @@
 #!/bin/bash
 set -e
 
+# Determine user and home directory
+if [ "$EUID" -eq 0 ]; then
+    USER_HOME="/root"
+else
+    USER_HOME="$HOME"
+fi
+
 # Configuration
 CONTAINER_NAME="rpi-chat"
 IMAGE_NAME="localhost/rpi-chat:latest"
 PORT=5000
-DB_PATH="$HOME/rpi-chat-data/chat.db"
-UPLOADS_PATH="$HOME/rpi-chat-data/uploads"
+DATA_PATH="$USER_HOME/rpi-chat-data"
+UPLOADS_PATH="$DATA_PATH/uploads"
 
 echo "🐋 RPi Chat Server - Podman Container"
 echo ""
@@ -19,8 +26,10 @@ fi
 
 # Create data directories
 echo "📁 Creating data directories..."
-mkdir -p "$HOME/rpi-chat-data"
+mkdir -p "$DATA_PATH"
 mkdir -p "$UPLOADS_PATH"
+mkdir -p "$UPLOADS_PATH/thumbnails"
+mkdir -p "$UPLOADS_PATH/files"
 
 # Copy source files to build context
 echo "📦 Preparing build context..."
@@ -39,32 +48,39 @@ if podman ps -a --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
     podman rm "$CONTAINER_NAME" 2>/dev/null || true
 fi
 
-# Run container
+# Run container with proper volume mounts
 echo "🚀 Starting container..."
 podman run -d \
     --name "$CONTAINER_NAME" \
-    --restart unless-stopped \
     -p "${PORT}:5000" \
-    -v "${UPLOADS_PATH}:/app/uploads:Z" \
-    -v "${DB_PATH}:/app/chat.db:Z" \
+    -v "${DATA_PATH}:/app/data:Z" \
     "$IMAGE_NAME"
 
-# Wait for container to be healthy
+# Wait for container to start
 echo "⏳ Waiting for container to start..."
 sleep 3
 
-# Get local IP
-LOCAL_IP=$(hostname -I | awk '{print $1}')
+# Check if container is running
+if podman ps | grep -q "$CONTAINER_NAME"; then
+    echo "✅ Container started successfully!"
+else
+    echo "❌ Container failed to start. Checking logs..."
+    podman logs "$CONTAINER_NAME"
+    exit 1
+fi
 
-echo ""
-echo "✅ Container started successfully!"
+# Get local IP
+LOCAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📱 Access:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Local: http://$LOCAL_IP:$PORT"
-echo "Setup: http://localhost:$PORT/setup"
+echo "Setup: http://$LOCAL_IP:$PORT/setup"
+echo ""
+echo "Data stored in: $DATA_PATH"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🛠️  Commands:"
@@ -75,4 +91,7 @@ echo "Stop:    podman stop $CONTAINER_NAME"
 echo "Start:   podman start $CONTAINER_NAME"
 echo "Shell:   podman exec -it $CONTAINER_NAME /bin/sh"
 echo "Remove:  podman rm -f $CONTAINER_NAME"
+echo ""
+echo "Note: Container will NOT auto-restart on boot."
+echo "      Use install-container.sh to enable auto-start with systemd."
 echo ""

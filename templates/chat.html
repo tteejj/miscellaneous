@@ -1781,13 +1781,47 @@
             }
         }
 
-        function handleReactionUpdate(data) {
+        async function handleReactionUpdate(data) {
+            if (data.channel_id !== currentChannelId) return;
+
             const msgElement = document.getElementById(`msg-${data.message_id}`);
             if (!msgElement) return;
 
-            // Reload the message to update reactions
-            // In a real app, we'd update just the reactions section
-            setTimeout(() => loadMessages(), 500);
+            // Reload just this message's data to update reactions
+            try {
+                const response = await fetch(`/api/messages/${currentChannelId}`);
+                const allData = await response.json();
+                const updatedMsg = allData.messages.find(m => m.id === data.message_id);
+
+                if (updatedMsg) {
+                    // Find and update just the reactions div
+                    const reactionsDiv = msgElement.querySelector('.reactions');
+                    if (reactionsDiv || Object.keys(updatedMsg.reactions || {}).length > 0) {
+                        let reactionsHTML = '';
+                        if (updatedMsg.reactions && Object.keys(updatedMsg.reactions).length > 0) {
+                            reactionsHTML = '<div class="reactions">';
+                            for (const [emoji, users] of Object.entries(updatedMsg.reactions)) {
+                                const isOwn = users.some(u => u.username === currentUsername);
+                                const ownClass = isOwn ? 'own' : '';
+                                const title = users.map(u => u.username).join(', ');
+                                reactionsHTML += `<div class="reaction ${ownClass}" title="${title}" onclick="toggleReaction(${updatedMsg.id}, '${emoji}')">${emoji} ${users.length}</div>`;
+                            }
+                            reactionsHTML += '</div>';
+                        }
+
+                        if (reactionsDiv) {
+                            reactionsDiv.outerHTML = reactionsHTML;
+                        } else if (reactionsHTML) {
+                            const contentDiv = msgElement.querySelector('.message-content');
+                            if (contentDiv) {
+                                contentDiv.insertAdjacentHTML('afterend', reactionsHTML);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating reactions:', error);
+            }
         }
 
         function showEmojiPicker(messageId, event) {
@@ -2075,6 +2109,17 @@
             if (menu.classList.contains('show') && !menu.contains(e.target) && e.target !== btn) {
                 menu.classList.remove('show');
                 btn.classList.remove('active');
+            }
+        });
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const menuToggle = document.querySelector('.menu-toggle');
+                if (sidebar && menuToggle && !sidebar.contains(e.target) && !menuToggle.contains(e.target) && !sidebar.classList.contains('hidden')) {
+                    sidebar.classList.add('hidden');
+                }
             }
         });
 

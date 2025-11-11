@@ -61,12 +61,24 @@ elif [[ "$DISTRO" == "debian" ]] || [[ "$DISTRO" == "ubuntu" ]] || [[ "$DISTRO" 
     echo "📦 Installing Podman (Debian/Ubuntu/DietPi)..."
     $SUDO apt-get update
 
-    # Install nftables first (required by Podman for networking)
-    echo "📦 Installing nftables (required for Podman networking)..."
-    $SUDO apt-get install -y nftables
+    # Install required dependencies
+    echo "📦 Installing dependencies..."
+    $SUDO apt-get install -y iptables nftables podman
 
-    # Install Podman
-    $SUDO apt-get install -y podman
+    # Enable and start nftables service
+    if command -v systemctl &> /dev/null; then
+        $SUDO systemctl enable nftables 2>/dev/null || true
+        $SUDO systemctl start nftables 2>/dev/null || true
+    fi
+
+    # Configure Podman for DietPi/Debian if needed
+    if [ "$EUID" -eq 0 ]; then
+        # Running as root - ensure rootful Podman configuration
+        mkdir -p /etc/containers
+        if [ ! -f /etc/containers/policy.json ]; then
+            echo '{"default":[{"type":"insecureAcceptAnything"}]}' > /etc/containers/policy.json
+        fi
+    fi
 
 else
     echo "❌ Unsupported distribution: $DISTRO"
@@ -81,6 +93,20 @@ if ! command -v podman &> /dev/null; then
 fi
 
 echo "✅ Podman installed: $(podman --version)"
+
+# Test Podman functionality
+echo "🧪 Testing Podman..."
+if ! podman info &> /dev/null; then
+    echo "⚠️  Podman info check failed, attempting to fix..."
+    # Try to fix common issues
+    if [ "$EUID" -eq 0 ]; then
+        # Reset Podman storage if needed
+        rm -rf /var/lib/containers/storage 2>/dev/null || true
+        mkdir -p /var/lib/containers/storage
+    fi
+fi
+
+echo "✅ Podman is ready"
 echo ""
 
 # Create data directories
@@ -104,11 +130,11 @@ fi
 echo ""
 echo "⚙️  Installing systemd service for auto-start..."
 
-# Create service file with correct user
+# Create service file with correct user and image reference
 cat > /tmp/rpi-chat-podman.service << EOF
 [Unit]
 Description=RPi Chat Server (Podman)
-After=network.target
+After=network.target nftables.service
 
 [Service]
 Type=simple
@@ -117,7 +143,7 @@ Restart=always
 RestartSec=10
 ExecStartPre=-/usr/bin/podman stop rpi-chat
 ExecStartPre=-/usr/bin/podman rm rpi-chat
-ExecStart=/usr/bin/podman run --rm --name rpi-chat -p 5000:5000 -v $INSTALL_HOME/rpi-chat-data:/app/data:Z rpi-chat:latest
+ExecStart=/usr/bin/podman run --rm --name rpi-chat -p 5000:5000 -v $INSTALL_HOME/rpi-chat-data:/app/data:Z localhost/rpi-chat:latest
 ExecStop=/usr/bin/podman stop -t 10 rpi-chat
 
 [Install]

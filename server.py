@@ -831,7 +831,7 @@ def post_message(channel_id):
     # Get the new message with user info
     cursor.execute('''
         SELECT m.id, m.message_type, m.content, m.metadata, m.timestamp, m.user_id,
-               u.username, u.avatar_color
+               u.username, u.avatar_color, u.avatar_url
         FROM messages m
         JOIN users u ON m.user_id = u.id
         WHERE m.id = ?
@@ -857,7 +857,8 @@ def post_message(channel_id):
         if matches:
             # Get user IDs for mentioned usernames
             placeholders = ','.join('?' * len(matches))
-            cursor.execute(f'SELECT id, username FROM users WHERE username IN ({placeholders})', matches)
+            query = 'SELECT id, username FROM users WHERE username IN ({})'.format(placeholders)
+            cursor.execute(query, matches)
             mentioned_users = [dict(row) for row in cursor.fetchall()]
 
         if use_markdown:

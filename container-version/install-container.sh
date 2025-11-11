@@ -11,10 +11,42 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
-# Install Podman
-echo "📦 Installing Podman..."
-sudo apt-get update
-sudo apt-get install -y podman
+# Detect distribution
+detect_distro() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DISTRO=$ID
+    elif command -v xbps-install &> /dev/null; then
+        DISTRO="void"
+    elif command -v apt-get &> /dev/null; then
+        DISTRO="debian"
+    else
+        echo "❌ Unable to detect distribution"
+        exit 1
+    fi
+}
+
+detect_distro
+
+echo "📋 Detected distribution: $DISTRO"
+echo ""
+
+# Install Podman based on distro
+if [[ "$DISTRO" == "void" ]]; then
+    echo "📦 Installing Podman (Void Linux)..."
+    sudo xbps-install -Su
+    sudo xbps-install -y podman
+
+elif [[ "$DISTRO" == "debian" ]] || [[ "$DISTRO" == "ubuntu" ]] || [[ "$DISTRO" == "raspbian" ]]; then
+    echo "📦 Installing Podman (Debian/Ubuntu)..."
+    sudo apt-get update
+    sudo apt-get install -y podman
+
+else
+    echo "❌ Unsupported distribution: $DISTRO"
+    echo "   Supported: Void Linux, Debian, Ubuntu, Raspbian"
+    exit 1
+fi
 
 # Verify Podman installation
 if ! command -v podman &> /dev/null; then
@@ -61,7 +93,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # Get local IP
-LOCAL_IP=$(hostname -I | awk '{print $1}')
+LOCAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
 
 echo "📱 Access: http://$LOCAL_IP:5000"
 echo ""
@@ -70,4 +102,16 @@ echo "🔐 Add HTTPS with Tailscale (Recommended):"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Run: ./setup-tailscale.sh"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🛠️  Useful Commands:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "View logs:    podman logs -f rpi-chat"
+echo "Restart:      podman restart rpi-chat"
+echo "Stop:         podman stop rpi-chat"
+echo "Start:        podman start rpi-chat"
+echo "Rebuild:      ./build-and-run.sh"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""

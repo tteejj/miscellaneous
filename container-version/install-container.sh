@@ -37,14 +37,14 @@ if [[ "$DISTRO" == "void" ]]; then
     sudo xbps-install -Su
     sudo xbps-install -y podman
 
-elif [[ "$DISTRO" == "debian" ]] || [[ "$DISTRO" == "ubuntu" ]] || [[ "$DISTRO" == "raspbian" ]]; then
-    echo "📦 Installing Podman (Debian/Ubuntu)..."
+elif [[ "$DISTRO" == "debian" ]] || [[ "$DISTRO" == "ubuntu" ]] || [[ "$DISTRO" == "raspbian" ]] || [[ "$DISTRO" == "dietpi" ]]; then
+    echo "📦 Installing Podman (Debian/Ubuntu/DietPi)..."
     sudo apt-get update
     sudo apt-get install -y podman
 
 else
     echo "❌ Unsupported distribution: $DISTRO"
-    echo "   Supported: Void Linux, Debian, Ubuntu, Raspbian"
+    echo "   Supported: Void Linux, Debian, Ubuntu, Raspbian, DietPi"
     exit 1
 fi
 

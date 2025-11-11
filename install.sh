@@ -39,8 +39,8 @@ if [[ "$DISTRO" == "void" ]]; then
     echo "📦 Installing dependencies..."
     sudo xbps-install -y python3 python3-pip python3-Pillow sqlite git
 
-elif [[ "$DISTRO" == "debian" ]] || [[ "$DISTRO" == "ubuntu" ]] || [[ "$DISTRO" == "raspbian" ]]; then
-    echo "📦 Updating system packages (Debian/Ubuntu)..."
+elif [[ "$DISTRO" == "debian" ]] || [[ "$DISTRO" == "ubuntu" ]] || [[ "$DISTRO" == "raspbian" ]] || [[ "$DISTRO" == "dietpi" ]]; then
+    echo "📦 Updating system packages (Debian/Ubuntu/DietPi)..."
     sudo apt-get update
 
     echo "📦 Installing dependencies..."
@@ -48,7 +48,7 @@ elif [[ "$DISTRO" == "debian" ]] || [[ "$DISTRO" == "ubuntu" ]] || [[ "$DISTRO" 
 
 else
     echo "❌ Unsupported distribution: $DISTRO"
-    echo "   Supported: Void Linux, Debian, Ubuntu, Raspbian"
+    echo "   Supported: Void Linux, Debian, Ubuntu, Raspbian, DietPi"
     exit 1
 fi
 

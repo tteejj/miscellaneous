@@ -24,10 +24,17 @@ COPY database.py .
 COPY server.py .
 COPY templates/ templates/
 
-# Create data directory structure
-RUN mkdir -p /app/data/uploads/thumbnails /app/data/uploads/files
+# Create non-root user first
+RUN adduser -D -u 1000 chatuser
 
-# Symlink data directory to expected paths
+# Create data directory and set ownership
+RUN mkdir -p /app/data/uploads/thumbnails /app/data/uploads/files && \
+    chown -R chatuser:chatuser /app /app/data
+
+# Switch to non-root user
+USER chatuser
+
+# Create symlinks as the chatuser
 RUN ln -sf /app/data/uploads /app/uploads && \
     ln -sf /app/data/chat.db /app/chat.db
 
@@ -41,10 +48,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')" || exit 1
 
-# Run as non-root user
-RUN adduser -D -u 1000 chatuser && \
-    chown -R chatuser:chatuser /app
-USER chatuser
-
-# Initialize database if it doesn't exist
-CMD ["sh", "-c", "python database.py && python server.py"]
+# Initialize database if it doesn't exist, then start server
+CMD ["sh", "-c", "test -f /app/data/chat.db || python database.py; python server.py"]

@@ -961,11 +961,6 @@
                 font-size: 0.8rem;
             }
 
-            /* Hide calendar on very small screens to save space */
-            .calendar-widget {
-                display: none;
-            }
-
             .message-avatar {
                 width: 32px;
                 height: 32px;
@@ -975,6 +970,14 @@
             .message {
                 padding: 0.5rem;
                 font-size: 0.9rem;
+            }
+        }
+
+        /* Extra small screens (iPod, old devices < 360px) */
+        @media (max-width: 360px) {
+            /* Hide calendar on very small screens to save space */
+            .calendar-widget {
+                display: none;
             }
         }
     </style>
@@ -1326,12 +1329,24 @@
                 eventSource = null;
             }
 
-            try {
-                eventSource = new EventSource(`/api/stream/${currentChannelId}`);
+            // Check if EventSource is supported
+            if (typeof EventSource === 'undefined') {
+                console.warn('EventSource not supported, falling back to polling');
+                // Fallback: poll for new messages every 5 seconds
+                setInterval(function() {
+                    if (currentChannelId) {
+                        loadMessages();
+                    }
+                }, 5000);
+                return;
+            }
 
-                eventSource.onmessage = (event) => {
+            try {
+                eventSource = new EventSource('/api/stream/' + currentChannelId);
+
+                eventSource.onmessage = function(event) {
                     try {
-                        const data = JSON.parse(event.data);
+                        var data = JSON.parse(event.data);
 
                         if (data.type === 'connected') {
                             console.log('SSE connected to channel', currentChannelId);
@@ -1359,7 +1374,7 @@
                     }
                 };
 
-                eventSource.onerror = (error) => {
+                eventSource.onerror = function(error) {
                     console.error('SSE connection error:', error);
                     if (eventSource) {
                         eventSource.close();
@@ -1367,11 +1382,19 @@
                     }
                     // Retry after 5 seconds if we still have a channel selected
                     if (currentChannelId) {
-                        setTimeout(() => connectSSE(), 5000);
+                        setTimeout(function() {
+                            connectSSE();
+                        }, 5000);
                     }
                 };
             } catch (error) {
                 console.error('Error creating SSE connection:', error);
+                // Fallback to polling if SSE fails
+                setInterval(function() {
+                    if (currentChannelId) {
+                        loadMessages();
+                    }
+                }, 5000);
             }
         }
 
@@ -1632,7 +1655,22 @@
         }
 
         function formatTimestamp(timestamp) {
-            const date = new Date(timestamp);
+            // SQLite returns timestamps like "YYYY-MM-DD HH:MM:SS"
+            // Need to convert to ISO format for proper parsing
+            let dateStr = timestamp;
+            if (typeof timestamp === 'string' && !timestamp.includes('T')) {
+                // Convert "YYYY-MM-DD HH:MM:SS" to ISO format "YYYY-MM-DDTHH:MM:SS"
+                dateStr = timestamp.replace(' ', 'T') + 'Z';  // Add Z for UTC
+            }
+
+            const date = new Date(dateStr);
+
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                console.error('Invalid timestamp:', timestamp);
+                return 'unknown time';
+            }
+
             const now = new Date();
             const diffMs = now - date;
             const diffMins = Math.floor(diffMs / 60000);
@@ -2210,7 +2248,12 @@
         }
 
         function formatEventTime(datetime) {
-            const date = new Date(datetime);
+            // Handle SQLite timestamp format
+            let dateStr = datetime;
+            if (typeof datetime === 'string' && !datetime.includes('T') && datetime.includes(' ')) {
+                dateStr = datetime.replace(' ', 'T');
+            }
+            const date = new Date(dateStr);
             return date.toLocaleString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -2291,9 +2334,17 @@
         });
 
         // Initialize on mobile - hide sidebar by default
-        if (window.innerWidth <= 768) {
-            var sidebar = document.getElementById('sidebar');
-            sidebar.className = sidebar.className + ' hidden';
+        try {
+            if (window.innerWidth <= 768) {
+                var sidebar = document.getElementById('sidebar');
+                if (sidebar) {
+                    if (sidebar.className.indexOf('hidden') === -1) {
+                        sidebar.className = sidebar.className + ' hidden';
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error initializing mobile sidebar:', error);
         }
 
         // Update presence every 30 seconds
@@ -2312,11 +2363,22 @@
             }
         });
 
-        // Initialize
-        checkAdmin();
-        loadChannels();
-        loadEvents();
-        renderCalendar();
+        // Global error handler for debugging
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            console.error('Global error:', msg, 'at', url, lineNo + ':' + columnNo);
+            return false;
+        };
+
+        // Initialize with error handling
+        try {
+            checkAdmin();
+            loadChannels();
+            loadEvents();
+            renderCalendar();
+        } catch (error) {
+            console.error('Initialization error:', error);
+            alert('Error loading chat. Please refresh the page.');
+        }
     </script>
 </body>
 </html>

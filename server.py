@@ -975,7 +975,7 @@ def upload_image(channel_id):
     # Get the message with user info
     cursor.execute('''
         SELECT m.id, m.message_type, m.content, m.timestamp,
-               u.username
+               u.username, u.avatar_color, u.avatar_url
         FROM messages m
         JOIN users u ON m.user_id = u.id
         WHERE m.id = ?
@@ -988,8 +988,14 @@ def upload_image(channel_id):
         'width': width,
         'height': height
     }
+    new_message['reactions'] = {}
+    new_message['edited'] = 0
+    new_message['pinned'] = 0
 
     conn.close()
+
+    # Broadcast via SSE
+    broadcast_message(channel_id, new_message)
 
     return jsonify(new_message), 201
 

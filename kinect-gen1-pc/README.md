@@ -17,6 +17,7 @@ kinect-gen1-pc/
 ├── 3d-scanning/            # 3D reconstruction and scanning tools
 ├── gesture-control/        # Gesture recognition and control systems
 ├── computer-vision/        # OpenCV and CV experiments
+├── llm-integration/        # AI-powered vision with LLM models (NEW!)
 ├── scripts/                # Installation and utility scripts
 └── docs/                   # Additional documentation
 ```
@@ -31,6 +32,7 @@ See [scripts/setup-drivers.md](scripts/setup-drivers.md) for detailed installati
 - **3D Scanning** → [3d-scanning/README.md](3d-scanning/README.md)
 - **Gesture Control** → [gesture-control/README.md](gesture-control/README.md)
 - **Computer Vision** → [computer-vision/README.md](computer-vision/README.md)
+- **🆕 LLM Integration** → [llm-integration/README.md](llm-integration/README.md) - AI-powered vision!
 
 ## Use Cases
 
@@ -56,6 +58,14 @@ See [scripts/setup-drivers.md](scripts/setup-drivers.md) for detailed installati
 - Motion tracking
 - Skeleton tracking
 - Research and experimentation
+
+### 🆕 LLM Integration (AI-Powered Vision)
+- **Scene understanding** - "What do you see?"
+- **Object finding** - "Where are my keys?"
+- **Natural language gestures** - Define gestures with words, not code
+- **Visual Q&A** - Ask questions about what Kinect sees
+- **Smart automation** - Context-aware home control
+- **Accessibility** - Describe surroundings for visually impaired
 
 ## System Requirements
 

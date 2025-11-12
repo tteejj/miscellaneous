@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV Remote Test - DEBUG MODE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            padding: 1rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+        }
+
+        .debug-panel {
+            background: #2d2d2d;
+            padding: 1.5rem;
+            border-radius: 10px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .debug-panel h2 {
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+
+        .status-indicator {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .status-indicator.loading {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-indicator.ready {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-indicator.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .log-entry {
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            background: #1a1a1a;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry.info { border-left: 3px solid #3b82f6; }
+        .log-entry.success { border-left: 3px solid #10b981; }
+        .log-entry.error { border-left: 3px solid #ef4444; }
+        .log-entry.warn { border-left: 3px solid #f59e0b; }
+
+        .remote-container {
+            background: #2d2d2d;
+            border-radius: 30px;
+            padding: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .remote-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            background: #3a3a3a;
+            border: none;
+            color: white;
+            cursor: pointer;
+            transition: all 0.15s;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            font-size: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn:hover {
+            background: #4a4a4a;
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn-test {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .btn-power {
+            background: #dc2626;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin: 0 auto 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        .btn-power:hover {
+            background: #b91c1c;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn-grid {
+            aspect-ratio: 1;
+            border-radius: 10px;
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-areas:
+                ". up ."
+                "left ok right"
+                ". down .";
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .btn-up { grid-area: up; }
+        .btn-down { grid-area: down; }
+        .btn-left { grid-area: left; }
+        .btn-right { grid-area: right; }
+        .btn-ok { grid-area: ok; background: #667eea; }
+
+        .btn-dpad {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            justify-self: center;
+        }
+
+        .test-section {
+            background: #3a3a3a;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .test-section h3 {
+            margin-bottom: 0.5rem;
+            color: #60a5fa;
+        }
+
+        .clear-btn {
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Debug Panel -->
+        <div class="debug-panel">
+            <h2>🔍 Debug Console</h2>
+
+            <div id="status" class="status-indicator loading">
+                ⏳ Initializing JavaScript...
+            </div>
+
+            <div class="test-section">
+                <h3>System Tests</h3>
+                <button class="btn-test" onclick="testFetch()">Test Fetch API</button>
+                <button class="btn-test" onclick="testJSON()">Test JSON Stringify</button>
+                <button class="btn-test" onclick="testEventListeners()">Test Event Listeners</button>
+                <button class="btn-test" onclick="testServerConnection()">Test Server Connection</button>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Event Log</h3>
+                <button class="clear-btn" onclick="clearLog()">Clear Log</button>
+            </div>
+
+            <div id="logContainer"></div>
+        </div>
+
+        <!-- Remote Control -->
+        <div class="remote-container">
+            <div class="remote-header">
+                <h1>TV Remote Test</h1>
+                <p>Samsung U8000F 50"</p>
+                <p style="font-size: 0.9rem; color: #aaa;">Click buttons and watch debug panel →</p>
+            </div>
+
+            <button class="btn btn-power" data-command="POWER">⏻</button>
+
+            <div class="button-grid">
+                <button class="btn btn-grid" data-command="HOME">🏠<br>Home</button>
+                <button class="btn btn-grid" data-command="NETFLIX">N<br>Netflix</button>
+                <button class="btn btn-grid" data-command="YOUTUBE">▶<br>YouTube</button>
+            </div>
+
+            <div class="dpad">
+                <button class="btn btn-dpad btn-up" data-command="UP">▲</button>
+                <button class="btn btn-dpad btn-left" data-command="LEFT">◀</button>
+                <button class="btn btn-dpad btn-ok" data-command="OK">OK</button>
+                <button class="btn btn-dpad btn-right" data-command="RIGHT">▶</button>
+                <button class="btn btn-dpad btn-down" data-command="DOWN">▼</button>
+            </div>
+
+            <div class="button-grid">
+                <button class="btn btn-grid" data-command="VOL_UP">Vol +</button>
+                <button class="btn btn-grid" data-command="MUTE">🔇<br>Mute</button>
+                <button class="btn btn-grid" data-command="VOL_DOWN">Vol −</button>
+            </div>
+
+            <div class="button-grid">
+                <button class="btn btn-grid" data-command="1">1</button>
+                <button class="btn btn-grid" data-command="2">2</button>
+                <button class="btn btn-grid" data-command="3">3</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let commandCount = 0;
+        let initStartTime = Date.now();
+
+        // Logging utility
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logContainer = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<strong>${timestamp}</strong> ${message}`;
+            logContainer.insertBefore(entry, logContainer.firstChild);
+
+            // Keep only last 50 entries
+            while (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('logContainer').innerHTML = '';
+            log('Log cleared', 'info');
+        }
+
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            const icons = {
+                loading: '⏳',
+                ready: '✅',
+                error: '❌'
+            };
+            statusEl.className = `status-indicator ${type}`;
+            statusEl.textContent = `${icons[type]} ${message}`;
+        }
+
+        // Test functions
+        async function testFetch() {
+            log('Testing Fetch API...', 'info');
+            try {
+                if (typeof fetch === 'undefined') {
+                    throw new Error('fetch is not defined!');
+                }
+                log('✓ Fetch API is available', 'success');
+                return true;
+            } catch (error) {
+                log(`✗ Fetch test failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        function testJSON() {
+            log('Testing JSON.stringify...', 'info');
+            try {
+                const test = { command: 'TEST' };
+                const json = JSON.stringify(test);
+                log(`✓ JSON.stringify works: ${json}`, 'success');
+                return true;
+            } catch (error) {
+                log(`✗ JSON test failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        function testEventListeners() {
+            log('Testing event listeners...', 'info');
+            const buttons = document.querySelectorAll('[data-command]');
+            log(`✓ Found ${buttons.length} buttons with data-command`, 'success');
+
+            buttons.forEach((btn, idx) => {
+                const cmd = btn.getAttribute('data-command');
+                log(`  Button ${idx}: command="${cmd}"`, 'info');
+            });
+
+            return buttons.length > 0;
+        }
+
+        async function testServerConnection() {
+            log('Testing server connection...', 'info');
+            try {
+                const response = await fetch('/api/test');
+                const data = await response.json();
+                log(`✓ Server responded: ${JSON.stringify(data)}`, 'success');
+                return true;
+            } catch (error) {
+                log(`✗ Server connection failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Main command function
+        async function sendCommand(command) {
+            commandCount++;
+            log(`📤 Sending command: ${command} (count: ${commandCount})`, 'info');
+
+            try {
+                log(`  → Creating fetch request to /api/remote/command`, 'info');
+                log(`  → Method: POST`, 'info');
+                log(`  → Body: ${JSON.stringify({ command })}`, 'info');
+
+                const startTime = Date.now();
+
+                const response = await fetch('/api/remote/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command })
+                });
+
+                const elapsed = Date.now() - startTime;
+                log(`  → Response received in ${elapsed}ms`, 'info');
+                log(`  → Status: ${response.status} ${response.statusText}`, 'info');
+
+                const data = await response.json();
+                log(`  → Response data: ${JSON.stringify(data)}`, 'info');
+
+                if (response.ok) {
+                    log(`✅ Command "${command}" sent successfully!`, 'success');
+                } else {
+                    log(`❌ Command failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Exception sending command: ${error.message}`, 'error');
+                log(`  → Error name: ${error.name}`, 'error');
+                log(`  → Error stack: ${error.stack}`, 'error');
+            }
+        }
+
+        // Initialize
+        function initializeRemote() {
+            const initTime = Date.now() - initStartTime;
+            log(`🚀 Initializing TV Remote Test (took ${initTime}ms)`, 'info');
+
+            // Check environment
+            log(`Browser: ${navigator.userAgent}`, 'info');
+            log(`URL: ${window.location.href}`, 'info');
+            log(`Protocol: ${window.location.protocol}`, 'info');
+
+            // Test all systems
+            log('Running system tests...', 'info');
+            const tests = [
+                testFetch(),
+                testJSON(),
+                testEventListeners()
+            ];
+
+            Promise.all(tests).then(results => {
+                const allPassed = results.every(r => r);
+                if (allPassed) {
+                    updateStatus('All systems ready!', 'ready');
+                    log('✅ All initialization tests passed', 'success');
+                } else {
+                    updateStatus('Some tests failed!', 'error');
+                    log('⚠️ Some initialization tests failed', 'warn');
+                }
+            });
+
+            // Attach event listeners
+            const buttons = document.querySelectorAll('[data-command]');
+            log(`Attaching click handlers to ${buttons.length} buttons`, 'info');
+
+            buttons.forEach((button, index) => {
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const command = e.currentTarget.getAttribute('data-command');
+                    log(`🖱️ Button ${index} clicked (command: ${command})`, 'info');
+                    sendCommand(command);
+                }, { passive: false });
+            });
+
+            log(`✅ Initialization complete - ready to test!`, 'success');
+        }
+
+        // Start initialization
+        log('🔧 Script loaded, starting initialization...', 'info');
+
+        if (document.readyState === 'loading') {
+            log('Document still loading, waiting for DOMContentLoaded', 'info');
+            document.addEventListener('DOMContentLoaded', initializeRemote);
+        } else {
+            log('Document already loaded, initializing immediately', 'info');
+            initializeRemote();
+        }
+    </script>
+</body>
+</html>

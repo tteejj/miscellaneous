@@ -1,0 +1,31 @@
+# Prime Number Checker
+# Checks if a number is prime
+
+define isPrime with n
+  if n <= 1 then
+    return false
+  end
+
+  set i to 2
+  while i * i <= n then
+    if (n mod i) = 0 then
+      return false
+    end
+    change i by 1
+  end
+
+  return true
+end
+
+say "Prime Number Finder"
+say "Finding all primes from 1 to 50:"
+
+for num from 1 to 50
+  set prime to (call isPrime with num)
+
+  if prime then
+    print num
+  end
+end
+
+say "Done!"

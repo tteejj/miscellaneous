@@ -1,0 +1,54 @@
+# Simple Calculator
+# Performs basic arithmetic operations
+
+define add with a, b
+  return a + b
+end
+
+define subtract with a, b
+  return a - b
+end
+
+define multiply with a, b
+  return a * b
+end
+
+define divide with a, b
+  if b = 0 then
+    say "Error: Cannot divide by zero!"
+    return 0
+  else
+    return a / b
+  end
+end
+
+say "Welcome to BlockScript Calculator!"
+
+ask "Enter first number:"
+set num1 to answer
+
+ask "Enter operation (+, -, *, /):"
+set op to answer
+
+ask "Enter second number:"
+set num2 to answer
+
+if op = "+" then
+  set result to (call add with num1, num2)
+  say join num1 and join " + " and join num2 and join " = " and result
+end
+
+if op = "-" then
+  set result to (call subtract with num1, num2)
+  say join num1 and join " - " and join num2 and join " = " and result
+end
+
+if op = "*" then
+  set result to (call multiply with num1, num2)
+  say join num1 and join " * " and join num2 and join " = " and result
+end
+
+if op = "/" then
+  set result to (call divide with num1, num2)
+  say join num1 and join " / " and join num2 and join " = " and result
+end

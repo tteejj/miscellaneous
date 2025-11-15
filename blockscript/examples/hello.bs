@@ -1,0 +1,10 @@
+# Hello World
+# The classic first program
+
+say "Hello, World!"
+say "Welcome to BlockScript!"
+
+ask "What's your name?"
+set name to answer
+
+say join "Nice to meet you, " and join name and "!"

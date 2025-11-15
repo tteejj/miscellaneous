@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlockScript IDE</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 BlockScript IDE</h1>
+            <p class="subtitle">A text-based programming language inspired by Scratch</p>
+        </header>
+
+        <div class="toolbar">
+            <button id="runBtn" class="btn btn-primary">▶️ Run</button>
+            <button id="stopBtn" class="btn btn-danger" disabled>⏹️ Stop</button>
+            <button id="lintBtn" class="btn btn-secondary">🔍 Lint</button>
+            <button id="clearBtn" class="btn btn-secondary">🗑️ Clear Output</button>
+            <select id="exampleSelect" class="example-select">
+                <option value="">Load Example...</option>
+                <option value="hello">Hello World</option>
+                <option value="countdown">Countdown</option>
+                <option value="fizzbuzz">FizzBuzz</option>
+                <option value="guess">Guessing Game</option>
+                <option value="list">List Demo</option>
+                <option value="function">Function Demo</option>
+            </select>
+        </div>
+
+        <div class="main-content">
+            <div class="editor-panel">
+                <div class="panel-header">
+                    <span>📝 Editor</span>
+                    <span class="info" id="editorInfo">Line 1, Col 1</span>
+                </div>
+                <textarea id="editor" spellcheck="false"></textarea>
+            </div>
+
+            <div class="output-panel">
+                <div class="panel-header">
+                    <span>📺 Output</span>
+                    <span class="info" id="statusInfo">Ready</span>
+                </div>
+                <div id="output"></div>
+            </div>
+        </div>
+
+        <div class="lint-panel" id="lintPanel" style="display: none;">
+            <div class="panel-header">
+                <span>🔍 Lint Results</span>
+                <button id="closeLintBtn" class="btn-close">✕</button>
+            </div>
+            <div id="lintResults"></div>
+        </div>
+
+        <footer>
+            <a href="https://github.com" target="_blank">Documentation</a> |
+            <a href="../docs/LANGUAGE_SPEC.md" target="_blank">Language Spec</a> |
+            <span>BlockScript v1.0.0</span>
+        </footer>
+    </div>
+
+    <script type="module" src="editor.js"></script>
+</body>
+</html>

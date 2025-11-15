@@ -1,0 +1,37 @@
+# Math Quiz Game
+# Tests basic arithmetic skills
+
+set score to 0
+set questions to 5
+
+say "Welcome to the Math Quiz!"
+say join "You'll answer " and join questions and " questions."
+
+for i from 1 to questions
+  set a to (random from 1 to 10)
+  set b to (random from 1 to 10)
+  set correct to a + b
+
+  ask join "Question " and join i and join ": What is " and join a and join " + " and join b and "?"
+
+  if answer = correct then
+    say "Correct!"
+    change score by 1
+  else
+    say join "Wrong! The answer is " and correct
+  end
+end
+
+say join "Quiz complete! You scored " and join score and join " out of " and questions
+
+set percentage to (score * 100) / questions
+
+if percentage >= 80 then
+  say "Excellent work!"
+else
+  if percentage >= 60 then
+    say "Good job!"
+  else
+    say "Keep practicing!"
+  end
+end

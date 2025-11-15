@@ -1,0 +1,40 @@
+# Bubble Sort Demo
+# Sorts a list of numbers
+
+create list numbers
+
+# Add some random numbers
+add 64 to numbers
+add 34 to numbers
+add 25 to numbers
+add 12 to numbers
+add 22 to numbers
+add 11 to numbers
+add 90 to numbers
+
+say "Original list:"
+for i from 1 to (length of numbers)
+  print item i of numbers
+end
+
+# Bubble sort
+set n to (length of numbers)
+
+for i from 1 to n
+  for j from 1 to n - 1
+    set a to (item j of numbers)
+    set b to (item (j + 1) of numbers)
+
+    if a > b then
+      # Swap
+      set temp to a
+      set item j of numbers to b
+      set item (j + 1) of numbers to temp
+    end
+  end
+end
+
+say "Sorted list:"
+for i from 1 to (length of numbers)
+  print item i of numbers
+end

@@ -1,0 +1,16 @@
+# Fibonacci Sequence
+# Calculate and display the first 15 Fibonacci numbers
+
+set a to 0
+set b to 1
+set count to 1
+
+say "First 15 Fibonacci numbers:"
+
+while count <= 15 then
+  print a
+  set temp to a
+  set a to b
+  set b to temp + b
+  change count by 1
+end

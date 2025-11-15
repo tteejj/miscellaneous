@@ -668,11 +668,22 @@ export class Parser {
       return new FunctionCall('random', [from, to], token.line, token.column);
     }
 
-    if (this.match(TokenType.ABS, TokenType.ROUND, TokenType.SQRT, TokenType.SIN, TokenType.COS, TokenType.TAN)) {
+    if (this.match(TokenType.ABS, TokenType.ROUND, TokenType.FLOOR, TokenType.CEIL, TokenType.SQRT, TokenType.SIN, TokenType.COS, TokenType.TAN)) {
       const funcName = this.tokens[this.pos - 1].value;
       this.expect(TokenType.OF);
       const value = this.parseExpression();
       return new FunctionCall(funcName, [value], token.line, token.column);
+    }
+
+    if (this.match(TokenType.POW, TokenType.MIN, TokenType.MAX)) {
+      const funcName = this.tokens[this.pos - 1].value;
+      this.expect(TokenType.OF);
+      const arg1 = this.parseExpression();
+      const args = [arg1];
+      while (this.match(TokenType.COMMA)) {
+        args.push(this.parseExpression());
+      }
+      return new FunctionCall(funcName, args, token.line, token.column);
     }
 
     // Check for "item X of LIST"

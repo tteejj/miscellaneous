@@ -113,8 +113,34 @@ export class Formatter {
           // Don't wrap comments
           wrapped.push(line);
         } else {
-          // Simple wrapping at commas or operators
-          wrapped.push(line); // TODO: Implement smart wrapping
+          // Smart wrapping at commas or operators
+          if (line.length <= maxLength) {
+            wrapped.push(line);
+          } else {
+            // Find good break points (commas, operators)
+            const indent = line.match(/^(\s*)/)[1];
+            let remaining = line;
+
+            while (remaining.length > maxLength) {
+              let breakPoint = maxLength;
+
+              // Look for comma or operator before maxLength
+              for (let i = maxLength; i > maxLength * 0.7; i--) {
+                const char = remaining[i];
+                if (char === ',' || char === '+' || char === '-' || char === '*' || char === '/') {
+                  breakPoint = i + 1;
+                  break;
+                }
+              }
+
+              wrapped.push(remaining.substring(0, breakPoint).trimEnd());
+              remaining = indent + '  ' + remaining.substring(breakPoint).trimStart();
+            }
+
+            if (remaining.trim().length > 0) {
+              wrapped.push(remaining);
+            }
+          }
         }
       }
     }

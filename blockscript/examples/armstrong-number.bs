@@ -11,7 +11,7 @@ set digits to 0
 while temp > 0 then
   change digits by 1
   set temp to temp / 10
-  set temp to (floor temp)
+  set temp to (floor of temp)
 end
 
 # Calculate sum
@@ -23,7 +23,7 @@ while temp > 0 then
   set power to digit ^ digits
   change sum by power
   set temp to temp / 10
-  set temp to (floor temp)
+  set temp to (floor of temp)
 end
 
 if sum = original then

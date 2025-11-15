@@ -453,6 +453,36 @@ export class Interpreter {
         }
         return Math.tan(args[0]);
       },
+      floor: async (args) => {
+        if (args.length !== 1) {
+          throw new RuntimeError('floor requires 1 argument', node.line, node.column);
+        }
+        return Math.floor(args[0]);
+      },
+      ceil: async (args) => {
+        if (args.length !== 1) {
+          throw new RuntimeError('ceil requires 1 argument', node.line, node.column);
+        }
+        return Math.ceil(args[0]);
+      },
+      pow: async (args) => {
+        if (args.length !== 2) {
+          throw new RuntimeError('pow requires 2 arguments', node.line, node.column);
+        }
+        return Math.pow(args[0], args[1]);
+      },
+      min: async (args) => {
+        if (args.length < 1) {
+          throw new RuntimeError('min requires at least 1 argument', node.line, node.column);
+        }
+        return Math.min(...args);
+      },
+      max: async (args) => {
+        if (args.length < 1) {
+          throw new RuntimeError('max requires at least 1 argument', node.line, node.column);
+        }
+        return Math.max(...args);
+      },
     };
 
     const args = [];

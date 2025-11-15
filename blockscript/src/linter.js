@@ -347,7 +347,7 @@ export class Linter {
         this.usedFunctions.add(node.name);
 
         // Check built-in functions
-        const builtins = ['join', 'length', 'letter', 'random', 'abs', 'round', 'sqrt', 'sin', 'cos', 'tan'];
+        const builtins = ['join', 'length', 'letter', 'random', 'abs', 'round', 'floor', 'ceil', 'sqrt', 'pow', 'min', 'max', 'sin', 'cos', 'tan'];
         if (!builtins.includes(node.name) && !this.functions.has(node.name)) {
           this.addWarning(
             `Function '${node.name}' not defined`,

@@ -13,7 +13,7 @@ define decimalToBinary with decimal
     set remainder to num mod 2
     add remainder to digits
     set num to num / 2
-    set num to (floor num)
+    set num to (floor of num)
   end
 
   # Reverse the digits

@@ -2,8 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="true">
+    <meta name="MobileOptimized" content="320">
     <title>Admin Panel - RPi Chat</title>
+
+    <!-- Compatibility detection (MUST load first) -->
+    <script src="/static/compat.js"></script>
+
+    <!-- Fallback UI for old browsers -->
+    <script src="/static/fallback-ui.js" defer></script>
+
+    <!-- Responsive CSS for tiny screens -->
+    <link rel="stylesheet" href="/static/tiny-screens.css">
     <style>
         * {
             margin: 0;
@@ -268,12 +280,12 @@
             }, 5000);
         }
 
-        async function createUser(event) {
+        function createUser(event) {
             event.preventDefault();
 
-            const username = document.getElementById('newUsername').value.trim();
-            const password = document.getElementById('newPassword').value.trim();
-            const is_admin = document.getElementById('makeAdmin').checked;
+            var username = document.getElementById('newUsername').value.trim();
+            var password = document.getElementById('newPassword').value.trim();
+            var is_admin = document.getElementById('makeAdmin').checked;
 
             if (!username || !password) {
                 showMessage('createMessage', 'Username and password required', false);
@@ -285,54 +297,57 @@
                 return;
             }
 
-            try {
-                const response = await fetch('/api/users', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ username, password, is_admin })
+            fetch('/api/users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: username, password: password, is_admin: is_admin })
+            })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (result.ok) {
+                        showMessage('createMessage', 'User created: ' + username + ' (Password: ' + result.data.user.password + ')', true);
+                        document.getElementById('createUserForm').reset();
+                        loadUsers();
+                    } else {
+                        showMessage('createMessage', result.data.error || 'Failed to create user', false);
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error creating user:', error);
+                    showMessage('createMessage', 'Failed to create user', false);
                 });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showMessage('createMessage', `User created: ${username} (Password: ${data.user.password})`, true);
-                    document.getElementById('createUserForm').reset();
-                    loadUsers();
-                } else {
-                    showMessage('createMessage', data.error || 'Failed to create user', false);
-                }
-            } catch (error) {
-                console.error('Error creating user:', error);
-                showMessage('createMessage', 'Failed to create user', false);
-            }
         }
 
-        async function loadUsers() {
-            try {
-                const response = await fetch('/api/users');
-                const users = await response.json();
+        function loadUsers() {
+            fetch('/api/users')
+                .then(function(response) { return response.json(); })
+                .then(function(users) {
+                    var tbody = document.getElementById('usersTableBody');
 
-                const tbody = document.getElementById('usersTableBody');
+                    if (users.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999;">No users yet</td></tr>';
+                        return;
+                    }
 
-                if (users.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999;">No users yet</td></tr>';
-                    return;
-                }
-
-                tbody.innerHTML = users.map(user => `
-                    <tr>
-                        <td>${escapeHtml(user.username)}</td>
-                        <td><span class="password-cell">••••••••</span></td>
-                        <td>${user.is_admin ? '<span class="admin-badge">Admin</span>' : 'User'}</td>
-                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
-                    </tr>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading users:', error);
-                showMessage('usersMessage', 'Failed to load users', false);
-            }
+                    tbody.innerHTML = users.map(function(user) {
+                        return '<tr>' +
+                            '<td>' + escapeHtml(user.username) + '</td>' +
+                            '<td><span class="password-cell">••••••••</span></td>' +
+                            '<td>' + (user.is_admin ? '<span class="admin-badge">Admin</span>' : 'User') + '</td>' +
+                            '<td>' + new Date(user.created_at).toLocaleDateString() + '</td>' +
+                        '</tr>';
+                    }).join('');
+                })
+                .catch(function(error) {
+                    console.error('Error loading users:', error);
+                    showMessage('usersMessage', 'Failed to load users', false);
+                });
         }
 
         function escapeHtml(text) {

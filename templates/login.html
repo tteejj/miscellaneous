@@ -2,8 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="true">
+    <meta name="MobileOptimized" content="320">
     <title>Login - RPi Chat</title>
+
+    <!-- Compatibility detection (MUST load first) -->
+    <script src="/static/compat.js"></script>
+
+    <!-- Responsive CSS for tiny screens -->
+    <link rel="stylesheet" href="/static/tiny-screens.css">
     <style>
         * {
             margin: 0;
@@ -99,6 +108,13 @@
     </style>
 </head>
 <body>
+    <!-- No JavaScript warning -->
+    <noscript>
+        <div style="position: fixed; top: 0; left: 0; right: 0; background: #ff9800; color: white; padding: 15px; text-align: center; font-weight: bold; z-index: 10000;">
+            ⚠️ JavaScript is required for this application to function properly.
+        </div>
+    </noscript>
+
     <div class="login-container">
         <h1>🔐 RPi Chat Login</h1>
 

@@ -2,8 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="true">
+    <meta name="MobileOptimized" content="320">
     <title>Samsung TV Remote - U8000F</title>
+
+    <!-- Compatibility detection (MUST load first) -->
+    <script src="/static/compat.js"></script>
+
+    <!-- Fallback UI for old browsers -->
+    <script src="/static/fallback-ui.js" defer></script>
+
+    <!-- Responsive CSS for tiny screens -->
+    <link rel="stylesheet" href="/static/tiny-screens.css">
     <style>
         * {
             margin: 0;
@@ -336,10 +348,10 @@
     <script>
         console.log('[REMOTE] Script tag executing');
 
-        async function sendCommand(command) {
+        function sendCommand(command) {
             console.log('[REMOTE] sendCommand called with:', command);
 
-            const feedbackDiv = document.getElementById('feedback');
+            var feedbackDiv = document.getElementById('feedback');
             if (!feedbackDiv) {
                 console.error('[REMOTE] Feedback div not found!');
                 return;
@@ -348,25 +360,25 @@
             feedbackDiv.textContent = command;
             feedbackDiv.classList.add('show');
 
-            setTimeout(() => {
+            setTimeout(function() {
                 feedbackDiv.classList.remove('show');
             }, 1000);
 
-            try {
-                const response = await fetch('/api/remote/command', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command: command })
+            fetch('/api/remote/command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: command })
+            })
+                .then(function(response) {
+                    if (response.ok) {
+                        console.log('[REMOTE] Command sent successfully:', command);
+                    } else {
+                        console.error('[REMOTE] Failed to send command, status:', response.status);
+                    }
+                })
+                .catch(function(error) {
+                    console.error('[REMOTE] Error sending command:', error);
                 });
-
-                if (response.ok) {
-                    console.log('[REMOTE] Command sent successfully:', command);
-                } else {
-                    console.error('[REMOTE] Failed to send command, status:', response.status);
-                }
-            } catch (error) {
-                console.error('[REMOTE] Error sending command:', error);
-            }
         }
 
         function initializeRemote() {
@@ -391,19 +403,19 @@
                 return;
             }
 
-            buttons.forEach((button, index) => {
-                button.addEventListener('click', (e) => {
+            buttons.forEach(function(button, index) {
+                button.addEventListener('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
-                    const command = e.currentTarget.getAttribute('data-command');
+                    var command = e.currentTarget.getAttribute('data-command');
                     console.log('[REMOTE] Button clicked:', index, 'command:', command);
                     sendCommand(command);
                 }, { passive: false });
             });
 
             // Add keyboard shortcuts
-            document.addEventListener('keydown', (e) => {
-                const keyMap = {
+            document.addEventListener('keydown', function(e) {
+                var keyMap = {
                     'ArrowUp': 'UP',
                     'ArrowDown': 'DOWN',
                     'ArrowLeft': 'LEFT',
@@ -437,7 +449,7 @@
         }
 
         // Backup initialization on window.onload
-        window.addEventListener('load', () => {
+        window.addEventListener('load', function() {
             console.log('[REMOTE] Window loaded event fired');
         });
     </script>

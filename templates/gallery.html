@@ -2,8 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="true">
+    <meta name="MobileOptimized" content="320">
     <title>Photo Gallery - RPi Chat</title>
+
+    <!-- Compatibility detection (MUST load first) -->
+    <script src="/static/compat.js"></script>
+
+    <!-- Fallback UI for old browsers -->
+    <script src="/static/fallback-ui.js" defer></script>
+
+    <!-- Responsive CSS for tiny screens -->
+    <link rel="stylesheet" href="/static/tiny-screens.css">
     <style>
         * {
             margin: 0;
@@ -200,38 +212,37 @@
             });
         }
 
-        async function loadGallery() {
-            try {
-                const response = await fetch(`/api/images/${channelId}`);
-                const images = await response.json();
+        function loadGallery() {
+            fetch('/api/images/' + channelId)
+                .then(function(response) { return response.json(); })
+                .then(function(images) {
+                    var loading = document.getElementById('loading');
+                    var gallery = document.getElementById('galleryGrid');
+                    var emptyState = document.getElementById('emptyState');
 
-                const loading = document.getElementById('loading');
-                const gallery = document.getElementById('galleryGrid');
-                const emptyState = document.getElementById('emptyState');
+                    loading.style.display = 'none';
 
-                loading.style.display = 'none';
+                    if (images.length === 0) {
+                        emptyState.style.display = 'block';
+                        return;
+                    }
 
-                if (images.length === 0) {
-                    emptyState.style.display = 'block';
-                    return;
-                }
-
-                gallery.style.display = 'grid';
-                gallery.innerHTML = images.map(img => `
-                    <div class="gallery-item" onclick="showFullImage('/uploads/${img.filename}')">
-                        <img src="/uploads/thumbnails/${img.thumbnail_filename}"
-                             alt="Photo by ${img.username}">
-                        <div class="gallery-item-info">
-                            <div class="gallery-item-user">${escapeHtml(img.username)}</div>
-                            <div class="gallery-item-date">${formatDate(img.timestamp)}</div>
-                            <div class="gallery-item-size">${formatFileSize(img.file_size)}</div>
-                        </div>
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading gallery:', error);
-                document.getElementById('loading').textContent = 'Failed to load gallery';
-            }
+                    gallery.style.display = 'grid';
+                    gallery.innerHTML = images.map(function(img) {
+                        return '<div class="gallery-item" onclick="showFullImage(\'/uploads/' + img.filename + '\')">' +
+                            '<img src="/uploads/thumbnails/' + img.thumbnail_filename + '" alt="Photo by ' + img.username + '">' +
+                            '<div class="gallery-item-info">' +
+                                '<div class="gallery-item-user">' + escapeHtml(img.username) + '</div>' +
+                                '<div class="gallery-item-date">' + formatDate(img.timestamp) + '</div>' +
+                                '<div class="gallery-item-size">' + formatFileSize(img.file_size) + '</div>' +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
+                })
+                .catch(function(error) {
+                    console.error('Error loading gallery:', error);
+                    document.getElementById('loading').textContent = 'Failed to load gallery';
+                });
         }
 
         function escapeHtml(text) {

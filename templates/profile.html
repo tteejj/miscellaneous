@@ -2,8 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="true">
+    <meta name="MobileOptimized" content="320">
     <title>Profile Settings - RPi Chat</title>
+
+    <!-- Compatibility detection (MUST load first) -->
+    <script src="/static/compat.js"></script>
+
+    <!-- Fallback UI for old browsers -->
+    <script src="/static/fallback-ui.js" defer></script>
+
+    <!-- Responsive CSS for tiny screens -->
+    <link rel="stylesheet" href="/static/tiny-screens.css">
     <style>
         * {
             margin: 0;
@@ -181,30 +193,31 @@
     </div>
 
     <script>
-        let currentUser = null;
+        var currentUser = null;
 
-        async function loadProfile() {
-            try {
-                const response = await fetch('/api/profile');
-                const data = await response.json();
-                currentUser = data;
+        function loadProfile() {
+            fetch('/api/profile')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    currentUser = data;
 
-                document.getElementById('username').textContent = data.username;
-                document.getElementById('userId').textContent = data.id;
+                    document.getElementById('username').textContent = data.username;
+                    document.getElementById('userId').textContent = data.id;
 
-                if (data.avatar_url) {
-                    document.getElementById('avatarPreview').innerHTML =
-                        `<img src="/uploads/avatars/${data.avatar_url}" alt="Avatar">`;
-                } else {
-                    const initials = getUserInitials(data.username);
-                    const avatarPreview = document.getElementById('avatarPreview');
-                    avatarPreview.style.background = data.avatar_color || '#667eea';
-                    document.getElementById('avatarInitials').textContent = initials;
-                }
-            } catch (error) {
-                console.error('Error loading profile:', error);
-                showMessage('Failed to load profile', 'error');
-            }
+                    if (data.avatar_url) {
+                        document.getElementById('avatarPreview').innerHTML =
+                            '<img src="/uploads/avatars/' + data.avatar_url + '" alt="Avatar">';
+                    } else {
+                        var initials = getUserInitials(data.username);
+                        var avatarPreview = document.getElementById('avatarPreview');
+                        avatarPreview.style.background = data.avatar_color || '#667eea';
+                        document.getElementById('avatarInitials').textContent = initials;
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error loading profile:', error);
+                    showMessage('Failed to load profile', 'error');
+                });
         }
 
         function getUserInitials(username) {
@@ -216,9 +229,9 @@
             return username.substring(0, 2).toUpperCase();
         }
 
-        async function uploadAvatar() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
+        function uploadAvatar() {
+            var fileInput = document.getElementById('fileInput');
+            var file = fileInput.files[0];
 
             if (!file) return;
 
@@ -228,28 +241,31 @@
                 return;
             }
 
-            const formData = new FormData();
+            var formData = new FormData();
             formData.append('file', file);
 
-            try {
-                const response = await fetch('/api/profile/avatar', {
-                    method: 'POST',
-                    body: formData
+            fetch('/api/profile/avatar', {
+                method: 'POST',
+                body: formData
+            })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (result.ok) {
+                        showMessage('Avatar uploaded successfully!', 'success');
+                        // Reload to show new avatar
+                        setTimeout(function() { loadProfile(); }, 500);
+                    } else {
+                        showMessage(result.data.error || 'Failed to upload avatar', 'error');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error uploading avatar:', error);
+                    showMessage('Failed to upload avatar', 'error');
                 });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showMessage('Avatar uploaded successfully!', 'success');
-                    // Reload to show new avatar
-                    setTimeout(() => loadProfile(), 500);
-                } else {
-                    showMessage(data.error || 'Failed to upload avatar', 'error');
-                }
-            } catch (error) {
-                console.error('Error uploading avatar:', error);
-                showMessage('Failed to upload avatar', 'error');
-            }
 
             fileInput.value = '';
         }

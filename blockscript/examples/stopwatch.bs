@@ -1,0 +1,53 @@
+# Stopwatch / Timer
+# Simple time tracking
+
+say "Stopwatch"
+say "Commands: start, stop, reset, quit"
+
+set running to false
+set elapsed to 0
+set startTime to 0
+
+set active to true
+
+while active then
+  ask "Command:"
+  set cmd to answer
+
+  if cmd = "start" then
+    if not running then
+      say "Started!"
+      set running to true
+      # In a real implementation, we'd track actual time
+    else
+      say "Already running!"
+    end
+  end
+
+  if cmd = "stop" then
+    if running then
+      say "Stopped!"
+      set running to false
+    else
+      say "Not running!"
+    end
+  end
+
+  if cmd = "reset" then
+    set elapsed to 0
+    set running to false
+    say "Reset!"
+  end
+
+  if cmd = "time" then
+    say join "Elapsed: " and join elapsed and " seconds"
+  end
+
+  if cmd = "quit" then
+    set active to false
+  end
+
+  if running then
+    change elapsed by 1
+  end
+end

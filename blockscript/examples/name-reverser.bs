@@ -1,0 +1,15 @@
+# Name Reverser
+# Reverse a name
+
+ask "Enter your name:"
+set name to answer
+
+set len to (length of name)
+set reversed to ""
+
+for i from len to 1
+  set char to (letter i of name)
+  set reversed to join reversed and char
+end
+
+say join "Reversed: " and reversed

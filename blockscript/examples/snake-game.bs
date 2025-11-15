@@ -1,0 +1,124 @@
+# Snake Game (Text-based)
+# Navigate the snake to eat food
+
+set width to 20
+set height to 10
+
+# Create board
+create list board
+set total to width * height
+for i from 1 to total
+  add " " to board
+end
+
+# Snake position
+create list snake
+add 55 to snake  # Starting position (middle)
+
+# Food position
+set foodPos to (random from 1 to total)
+
+# Direction (1=up, 2=down, 3=left, 4=right)
+set dir to 4
+
+# Game state
+set score to 0
+set gameOver to false
+
+define drawBoard
+  for y from 1 to height
+    set line to ""
+    for x from 1 to width
+      set pos to (y - 1) * width + x
+
+      # Check if snake
+      set isSnake to false
+      for i from 1 to (length of snake)
+        if (item i of snake) = pos then
+          set isSnake to true
+        end
+      end
+
+      if isSnake then
+        set line to join line and "O"
+      else
+        if pos = foodPos then
+          set line to join line and "*"
+        else
+          set line to join line and "."
+        end
+      end
+    end
+    print line
+  end
+
+  say join "Score: " and score
+end
+
+say "Snake Game!"
+say "Use commands: up, down, left, right"
+say "Eat the * to grow!"
+
+# Simple game loop (limited turns)
+for turn from 1 to 30
+  call drawBoard
+
+  if not gameOver then
+    ask "Direction (up/down/left/right):"
+    set input to answer
+
+    if input = "up" then
+      set dir to 1
+    end
+    if input = "down" then
+      set dir to 2
+    end
+    if input = "left" then
+      set dir to 3
+    end
+    if input = "right" then
+      set dir to 4
+    end
+
+    # Move snake
+    set headPos to (item 1 of snake)
+    set newHead to headPos
+
+    if dir = 1 then
+      change newHead by (0 - width)
+    end
+    if dir = 2 then
+      change newHead by width
+    end
+    if dir = 3 then
+      change newHead by -1
+    end
+    if dir = 4 then
+      change newHead by 1
+    end
+
+    # Check if ate food
+    if newHead = foodPos then
+      change score by 10
+      set foodPos to (random from 1 to total)
+      # Add to snake (grow)
+      create list newSnake
+      add newHead to newSnake
+      for i from 1 to (length of snake)
+        add (item i of snake) to newSnake
+      end
+      set snake to newSnake
+    else
+      # Move without growing
+      create list newSnake
+      add newHead to newSnake
+      for i from 1 to ((length of snake) - 1)
+        add (item i of snake) to newSnake
+      end
+      set snake to newSnake
+    end
+  end
+end
+
+say "Game Over!"
+say join "Final Score: " and score

@@ -1,0 +1,163 @@
+# Text Adventure Game
+# Explore a mysterious dungeon
+
+create list inventory
+set health to 100
+set hasKey to false
+set hasSword to false
+set currentRoom to "entrance"
+
+define showStatus
+  say ""
+  say "========================"
+  say join "Health: " and health
+  if (length of inventory) > 0 then
+    set items to ""
+    for i from 1 to (length of inventory)
+      set item to (item i of inventory)
+      set items to join items and join item and ", "
+    end
+    say join "Inventory: " and items
+  else
+    say "Inventory: empty"
+  end
+  say "========================"
+  say ""
+end
+
+define roomDescription with room
+  if room = "entrance" then
+    say "You are at the entrance of a dark dungeon."
+    say "You can go NORTH."
+  end
+
+  if room = "hallway" then
+    say "A long hallway stretches before you."
+    say "You can go NORTH or SOUTH."
+    if not hasSword then
+      say "There is a SWORD on the ground."
+    end
+  end
+
+  if room = "armory" then
+    say "You are in an old armory."
+    say "Rusty weapons line the walls."
+    say "You can go SOUTH."
+    if not hasKey then
+      say "There is a KEY on a table."
+    end
+  end
+
+  if room = "treasureRoom" then
+    say "You found the treasure room!"
+    say "Gold and jewels surround you!"
+    say "You WIN!"
+  end
+end
+
+define handleAction with action, room
+  if action = "north" then
+    if room = "entrance" then
+      set currentRoom to "hallway"
+      say "You walk north..."
+      return currentRoom
+    end
+
+    if room = "hallway" then
+      if hasKey then
+        say "You unlock the door with your key!"
+        set currentRoom to "treasureRoom"
+        return currentRoom
+      else
+        say "The door is locked. You need a key."
+        return room
+      end
+    end
+  end
+
+  if action = "south" then
+    if room = "hallway" then
+      set currentRoom to "entrance"
+      say "You walk south..."
+      return currentRoom
+    end
+
+    if room = "armory" then
+      set currentRoom to "hallway"
+      say "You walk south..."
+      return currentRoom
+    end
+  end
+
+  if action = "take sword" then
+    if room = "hallway" then
+      if not hasSword then
+        set hasSword to true
+        add "sword" to inventory
+        say "You picked up the sword!"
+        return room
+      else
+        say "You already have the sword."
+        return room
+      end
+    end
+  end
+
+  if action = "take key" then
+    if room = "armory" then
+      if not hasKey then
+        set hasKey to true
+        add "key" to inventory
+        say "You picked up the key!"
+        return room
+      else
+        say "You already have the key."
+        return room
+      end
+    end
+  end
+
+  if action = "east" then
+    if room = "hallway" then
+      set currentRoom to "armory"
+      say "You walk east..."
+      return currentRoom
+    end
+  end
+
+  say "You can't do that here."
+  return room
+end
+
+say "==================================="
+say "  DUNGEON ADVENTURE"
+say "==================================="
+say ""
+say "Commands: north, south, east, west"
+say "          take [item]"
+say "          quit"
+say ""
+
+set playing to true
+
+while playing then
+  call showStatus
+  call roomDescription with currentRoom
+
+  if currentRoom = "treasureRoom" then
+    say ""
+    say "Thanks for playing!"
+    set playing to false
+  else
+    say ""
+    ask "What do you do?"
+    set action to answer
+
+    if action = "quit" then
+      say "Thanks for playing!"
+      set playing to false
+    else
+      set currentRoom to (call handleAction with action, currentRoom)
+    end
+  end
+end

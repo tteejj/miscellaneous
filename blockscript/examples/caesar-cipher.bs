@@ -1,0 +1,51 @@
+# Caesar Cipher
+# Encrypt and decrypt messages
+
+define encrypt with text, shift
+  set result to ""
+  set len to (length of text)
+
+  for i from 1 to len
+    set char to (letter i of text)
+
+    # Only shift letters
+    set isLower to false
+    set isUpper to false
+
+    # Check if lowercase (a-z)
+    # This is simplified - in a real implementation we'd check ASCII codes
+    if char = "a" then set isLower to true end
+    if char = "b" then set isLower to true end
+    if char = "c" then set isLower to true end
+    # ... etc
+
+    if isLower then
+      # Shift lowercase letter
+      # Simplified for demonstration
+      set result to join result and char
+    else
+      set result to join result and char
+    end
+  end
+
+  return result
+end
+
+say "Caesar Cipher"
+say ""
+say "This is a simplified demo"
+say ""
+
+ask "Enter message:"
+set message to answer
+
+ask "Enter shift (1-25):"
+set shift to answer
+
+say ""
+say "Original:"
+print message
+
+say ""
+say "Note: Full implementation would shift each letter"
+say "by the specified amount in the alphabet."

@@ -1,0 +1,153 @@
+# Blackjack Game
+# Play against the dealer
+
+define cardValue with card
+  if card = "A" then
+    return 11
+  end
+  if card = "K" then
+    return 10
+  end
+  if card = "Q" then
+    return 10
+  end
+  if card = "J" then
+    return 10
+  end
+  return card
+end
+
+define calculateTotal with hand
+  set total to 0
+  set aces to 0
+
+  for i from 1 to (length of hand)
+    set card to (item i of hand)
+    set value to (call cardValue with card)
+    change total by value
+
+    if card = "A" then
+      change aces by 1
+    end
+  end
+
+  # Adjust for aces
+  while (total > 21) and (aces > 0) then
+    change total by -10
+    change aces by -1
+  end
+
+  return total
+end
+
+define dealCard with hand
+  set cardNum to (random from 1 to 13)
+
+  if cardNum = 1 then
+    add "A" to hand
+  else
+    if cardNum = 11 then
+      add "J" to hand
+    else
+      if cardNum = 12 then
+        add "Q" to hand
+      else
+        if cardNum = 13 then
+          add "K" to hand
+        else
+          add cardNum to hand
+        end
+      end
+    end
+  end
+end
+
+define showHand with hand, name, hideFirst
+  set display to join name and ": "
+
+  for i from 1 to (length of hand)
+    if hideFirst and (i = 1) then
+      set display to join display and "?? "
+    else
+      set card to (item i of hand)
+      set display to join display and join card and " "
+    end
+  end
+
+  print display
+end
+
+say "Welcome to Blackjack!"
+
+create list playerHand
+create list dealerHand
+
+# Deal initial cards
+call dealCard with playerHand
+call dealCard with dealerHand
+call dealCard with playerHand
+call dealCard with dealerHand
+
+set gameOver to false
+
+while not gameOver then
+  say ""
+  call showHand with dealerHand, "Dealer", true
+  call showHand with playerHand, "Player", false
+
+  set playerTotal to (call calculateTotal with playerHand)
+  say join "Your total: " and playerTotal
+
+  if playerTotal = 21 then
+    say "Blackjack!"
+    set gameOver to true
+  else
+    if playerTotal > 21 then
+      say "Bust! You lose!"
+      set gameOver to true
+    else
+      ask "Hit or Stand? (h/s):"
+      set choice to answer
+
+      if choice = "h" then
+        call dealCard with playerHand
+      else
+        # Dealer's turn
+        say ""
+        say "Dealer's turn:"
+        call showHand with dealerHand, "Dealer", false
+
+        set dealerTotal to (call calculateTotal with dealerHand)
+        say join "Dealer total: " and dealerTotal
+
+        while dealerTotal < 17 then
+          say "Dealer hits"
+          call dealCard with dealerHand
+          call showHand with dealerHand, "Dealer", false
+          set dealerTotal to (call calculateTotal with dealerHand)
+          say join "Dealer total: " and dealerTotal
+        end
+
+        say ""
+
+        if dealerTotal > 21 then
+          say "Dealer busts! You win!"
+        else
+          if playerTotal > dealerTotal then
+            say join "You win! " and join playerTotal and join " vs " and dealerTotal
+          else
+            if playerTotal = dealerTotal then
+              say "Push (tie)!"
+            else
+              say join "Dealer wins! " and join dealerTotal and join " vs " and playerTotal
+            end
+          end
+        end
+
+        set gameOver to true
+      end
+    end
+  end
+end
+
+say "Game Over!"

@@ -1,0 +1,30 @@
+# BMI Calculator
+# Calculate Body Mass Index
+
+say "BMI Calculator"
+
+ask "Weight (kg):"
+set weight to answer
+
+ask "Height (meters):"
+set height to answer
+
+set bmi to weight / (height * height)
+set bmi to (round bmi)
+
+say ""
+say join "Your BMI: " and bmi
+
+if bmi < 18.5 then
+  say "Category: Underweight"
+else
+  if bmi < 25 then
+    say "Category: Normal weight"
+  else
+    if bmi < 30 then
+      say "Category: Overweight"
+    else
+      say "Category: Obese"
+    end
+  end
+end

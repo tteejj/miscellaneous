@@ -1,0 +1,44 @@
+# Magic 8 Ball
+# Get mystical answers to your questions
+
+create list responses
+add "Yes, definitely!" to responses
+add "It is certain." to responses
+add "Without a doubt." to responses
+add "Yes." to responses
+add "Most likely." to responses
+add "Outlook good." to responses
+add "Signs point to yes." to responses
+add "Reply hazy, try again." to responses
+add "Ask again later." to responses
+add "Better not tell you now." to responses
+add "Cannot predict now." to responses
+add "Concentrate and ask again." to responses
+add "Don't count on it." to responses
+add "My reply is no." to responses
+add "My sources say no." to responses
+add "Outlook not so good." to responses
+add "Very doubtful." to responses
+
+say "🎱 Magic 8 Ball"
+say "Ask a yes/no question (or 'quit')"
+
+set playing to true
+
+while playing then
+  ask "Your question:"
+  set question to answer
+
+  if question = "quit" then
+    set playing to false
+  else
+    set idx to (random from 1 to (length of responses))
+    set response to (item idx of responses)
+
+    say "🎱 The Magic 8 Ball says..."
+    say response
+    say ""
+  end
+end
+
+say "Goodbye!"

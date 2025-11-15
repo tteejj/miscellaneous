@@ -1,0 +1,112 @@
+# ASCII Art Generator
+# Create simple patterns
+
+define drawBox with width, height
+  # Top border
+  set line to ""
+  for i from 1 to width
+    set line to join line and "#"
+  end
+  print line
+
+  # Middle
+  for i from 1 to (height - 2)
+    set line to "#"
+    for j from 1 to (width - 2)
+      set line to join line and " "
+    end
+    set line to join line and "#"
+    print line
+  end
+
+  # Bottom border
+  set line to ""
+  for i from 1 to width
+    set line to join line and "#"
+  end
+  print line
+end
+
+define drawTriangle with size
+  for row from 1 to size
+    set line to ""
+
+    # Spaces
+    set spaces to size - row
+    for i from 1 to spaces
+      set line to join line and " "
+    end
+
+    # Stars
+    set stars to row * 2 - 1
+    for i from 1 to stars
+      set line to join line and "*"
+    end
+
+    print line
+  end
+end
+
+define drawDiamond with size
+  # Top half
+  for row from 1 to size
+    set line to ""
+
+    set spaces to size - row
+    for i from 1 to spaces
+      set line to join line and " "
+    end
+
+    set stars to row * 2 - 1
+    for i from 1 to stars
+      set line to join line and "*"
+    end
+
+    print line
+  end
+
+  # Bottom half
+  for row from (size - 1) to 1
+    set line to ""
+
+    set spaces to size - row
+    for i from 1 to spaces
+      set line to join line and " "
+    end
+
+    set stars to row * 2 - 1
+    for i from 1 to stars
+      set line to join line and "*"
+    end
+
+    print line
+  end
+end
+
+say "ASCII Art Generator"
+say "1. Box"
+say "2. Triangle"
+say "3. Diamond"
+
+ask "Choose shape:"
+set choice to answer
+
+if choice = 1 then
+  ask "Width:"
+  set w to answer
+  ask "Height:"
+  set h to answer
+  call drawBox with w, h
+end
+
+if choice = 2 then
+  ask "Size:"
+  set s to answer
+  call drawTriangle with s
+end
+
+if choice = 3 then
+  ask "Size:"
+  set s to answer
+  call drawDiamond with s
+end

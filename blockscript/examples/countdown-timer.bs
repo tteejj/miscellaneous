@@ -1,0 +1,19 @@
+# Countdown Timer
+# Count down from a number
+
+ask "Countdown from:"
+set count to answer
+
+say "Starting countdown..."
+
+while count >= 0 then
+  if count = 0 then
+    say "🎉 TIME'S UP!"
+  else
+    print count
+  end
+
+  change count by -1
+end
+
+say "Countdown complete!"

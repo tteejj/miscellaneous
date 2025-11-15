@@ -1,0 +1,91 @@
+# Rock, Paper, Scissors
+# Best of 5 tournament
+
+set playerWins to 0
+set computerWins to 0
+set ties to 0
+
+say "Rock, Paper, Scissors - Best of 5!"
+say ""
+
+for round from 1 to 5
+  say join "Round " and round
+
+  ask "Choose: rock, paper, or scissors"
+  set playerChoice to answer
+
+  set computerNum to (random from 1 to 3)
+  set computerChoice to ""
+
+  if computerNum = 1 then
+    set computerChoice to "rock"
+  end
+
+  if computerNum = 2 then
+    set computerChoice to "paper"
+  end
+
+  if computerNum = 3 then
+    set computerChoice to "scissors"
+  end
+
+  say join "Computer chose: " and computerChoice
+
+  if playerChoice = computerChoice then
+    say "It's a tie!"
+    change ties by 1
+  else
+    if playerChoice = "rock" then
+      if computerChoice = "scissors" then
+        say "Rock crushes scissors - You win!"
+        change playerWins by 1
+      else
+        say "Paper covers rock - Computer wins!"
+        change computerWins by 1
+      end
+    end
+
+    if playerChoice = "paper" then
+      if computerChoice = "rock" then
+        say "Paper covers rock - You win!"
+        change playerWins by 1
+      else
+        say "Scissors cuts paper - Computer wins!"
+        change computerWins by 1
+      end
+    end
+
+    if playerChoice = "scissors" then
+      if computerChoice = "paper" then
+        say "Scissors cuts paper - You win!"
+        change playerWins by 1
+      else
+        say "Rock crushes scissors - Computer wins!"
+        change computerWins by 1
+      end
+    end
+  end
+
+  say ""
+  say join "Score - You: " and join playerWins and join " Computer: " and computerWins
+  say ""
+end
+
+say "============================="
+say "FINAL RESULTS"
+say "============================="
+say join "Your wins: " and playerWins
+say join "Computer wins: " and computerWins
+say join "Ties: " and ties
+
+say ""
+
+if playerWins > computerWins then
+  say "YOU WIN THE TOURNAMENT!"
+else
+  if computerWins > playerWins then
+    say "COMPUTER WINS THE TOURNAMENT!"
+  else
+    say "IT'S A TIE!"
+  end
+end

@@ -1,0 +1,44 @@
+# Digital Clock Simulator
+# Simulate time passing
+
+say "Digital Clock"
+ask "Starting hour (0-23):"
+set hour to answer
+
+ask "Starting minute (0-59):"
+set minute to answer
+
+ask "How many minutes to simulate:"
+set duration to answer
+
+for i from 1 to duration
+  # Display time
+  set hourStr to ""
+  set minStr to ""
+
+  if hour < 10 then
+    set hourStr to join "0" and hour
+  else
+    set hourStr to hour
+  end
+
+  if minute < 10 then
+    set minStr to join "0" and minute
+  else
+    set minStr to minute
+  end
+
+  print join hourStr and join ":" and minStr
+
+  # Increment minute
+  change minute by 1
+
+  if minute >= 60 then
+    set minute to 0
+    change hour by 1
+
+    if hour >= 24 then
+      set hour to 0
+    end
+  end
+end

@@ -1,0 +1,91 @@
+# Contact Manager
+# Store and manage contacts
+
+create list names
+create list phones
+create list emails
+
+define addContact
+  ask "Name:"
+  set name to answer
+  add name to names
+
+  ask "Phone:"
+  set phone to answer
+  add phone to phones
+
+  ask "Email:"
+  set email to answer
+  add email to emails
+
+  say "Contact added!"
+end
+
+define listContacts
+  if (length of names) = 0 then
+    say "No contacts!"
+  else
+    say "=== Contacts ==="
+    for i from 1 to (length of names)
+      set name to (item i of names)
+      set phone to (item i of phones)
+      set email to (item i of emails)
+
+      print join i and join ". " and name
+      print join "   Phone: " and phone
+      print join "   Email: " and email
+      print ""
+    end
+  end
+end
+
+define searchContact
+  ask "Search name:"
+  set search to answer
+
+  set found to false
+  for i from 1 to (length of names)
+    set name to (item i of names)
+    if name = search then
+      set found to true
+      set phone to (item i of phones)
+      set email to (item i of emails)
+
+      say join "Found: " and name
+      print join "Phone: " and phone
+      print join "Email: " and email
+    end
+  end
+
+  if not found then
+    say "Contact not found!"
+  end
+end
+
+say "Contact Manager"
+say "Commands: add, list, search, quit"
+
+set running to true
+
+while running then
+  ask "Command:"
+  set cmd to answer
+
+  if cmd = "add" then
+    call addContact
+  end
+
+  if cmd = "list" then
+    call listContacts
+  end
+
+  if cmd = "search" then
+    call searchContact
+  end
+
+  if cmd = "quit" then
+    set running to false
+  end
+end
+
+say "Goodbye!"

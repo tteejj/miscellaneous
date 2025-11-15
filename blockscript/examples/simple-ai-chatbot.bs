@@ -1,0 +1,129 @@
+# Simple AI Chatbot
+# Pattern-based conversation bot
+
+define respond with input
+  # Greetings
+  if input = "hello" then
+    return "Hi there! How can I help you?"
+  end
+
+  if input = "hi" then
+    return "Hello! What can I do for you?"
+  end
+
+  if input = "hey" then
+    return "Hey! How's it going?"
+  end
+
+  # Questions about the bot
+  if input = "what is your name" then
+    return "I'm BlockBot, a simple chatbot!"
+  end
+
+  if input = "who are you" then
+    return "I'm a chatbot written in BlockScript!"
+  end
+
+  if input = "how are you" then
+    return "I'm just a program, but I'm functioning well! How are you?"
+  end
+
+  # Math capabilities
+  if input = "can you do math" then
+    return "Yes! Try asking me to add, subtract, multiply, or divide numbers."
+  end
+
+  # Time
+  if input = "what time is it" then
+    return "I don't have access to a clock, sorry!"
+  end
+
+  # Jokes
+  if input = "tell me a joke" then
+    set jokes to (random from 1 to 3)
+
+    if jokes = 1 then
+      return "Why do programmers prefer dark mode? Because light attracts bugs!"
+    end
+
+    if jokes = 2 then
+      return "Why did the programmer quit? They didn't get arrays!"
+    end
+
+    if jokes = 3 then
+      return "How many programmers does it take to change a light bulb? None, that's a hardware problem!"
+    end
+  end
+
+  # Farewell
+  if input = "bye" then
+    return "Goodbye! Have a great day!"
+  end
+
+  if input = "goodbye" then
+    return "See you later!"
+  end
+
+  if input = "quit" then
+    return "Bye! Thanks for chatting!"
+  end
+
+  # Default response
+  set responses to (random from 1 to 4)
+
+  if responses = 1 then
+    return "I'm not sure I understand. Can you rephrase that?"
+  end
+
+  if responses = 2 then
+    return "Interesting! Tell me more."
+  end
+
+  if responses = 3 then
+    return "Hmm, I don't know much about that."
+  end
+
+  if responses = 4 then
+    return "That's a good question! Unfortunately, I'm a simple bot."
+  end
+
+  return "I'm not sure how to respond to that."
+end
+
+say "========================================="
+say "  BlockBot - Simple Chatbot"
+say "========================================="
+say ""
+say "Try saying:"
+say "  - hello, hi, hey"
+say "  - what is your name"
+say "  - tell me a joke"
+say "  - bye, goodbye, quit"
+say ""
+say "Type 'quit' to exit"
+say ""
+
+set chatting to true
+
+while chatting then
+  ask "You:"
+  set input to answer
+
+  # Convert to lowercase for matching
+  # (In a real implementation, we'd have a lowercase function)
+  set input to answer
+
+  if input = "quit" then
+    set chatting to false
+  end
+
+  set response to (call respond with input)
+  say join "Bot: " and response
+  say ""
+
+  if input = "quit" then
+    set chatting to false
+  end
+end
+
+say "Goodbye!"

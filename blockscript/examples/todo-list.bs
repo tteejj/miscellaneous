@@ -1,0 +1,102 @@
+# To-Do List Manager
+# Manage your tasks
+
+create list todos
+create list completed
+
+define showTodos
+  say ""
+  say "=== To-Do List ==="
+
+  if (length of todos) = 0 then
+    say "No pending tasks!"
+  else
+    for i from 1 to (length of todos)
+      set task to (item i of todos)
+      set display to join i and join ". " and task
+      print display
+    end
+  end
+
+  if (length of completed) > 0 then
+    say ""
+    say "=== Completed ==="
+    for i from 1 to (length of completed)
+      set task to (item i of completed)
+      print join "✓ " and task
+    end
+  end
+
+  say ""
+end
+
+define addTodo with task
+  add task to todos
+  say join "Added: " and task
+end
+
+define completeTodo with index
+  if (index >= 1) and (index <= (length of todos)) then
+    set task to (item index of todos)
+    add task to completed
+    delete item index of todos
+    say join "Completed: " and task
+  else
+    say "Invalid task number!"
+  end
+end
+
+define removeTodo with index
+  if (index >= 1) and (index <= (length of todos)) then
+    set task to (item index of todos)
+    delete item index of todos
+    say join "Removed: " and task
+  else
+    say "Invalid task number!"
+  end
+end
+
+say "Welcome to To-Do List Manager!"
+say "Commands: add, complete, remove, show, quit"
+
+set running to true
+
+while running then
+  say ""
+  ask "Enter command:"
+  set cmd to answer
+
+  if cmd = "add" then
+    ask "Enter task:"
+    set task to answer
+    call addTodo with task
+  end
+
+  if cmd = "complete" then
+    call showTodos
+    ask "Enter task number to complete:"
+    set num to answer
+    call completeTodo with num
+  end
+
+  if cmd = "remove" then
+    call showTodos
+    ask "Enter task number to remove:"
+    set num to answer
+    call removeTodo with num
+  end
+
+  if cmd = "show" then
+    call showTodos
+  end
+
+  if cmd = "quit" then
+    say "Goodbye!"
+    set running to false
+  end
+
+  if (cmd != "add") and (cmd != "complete") and (cmd != "remove") and (cmd != "show") and (cmd != "quit") then
+    say "Unknown command!"
+    say "Commands: add, complete, remove, show, quit"
+  end
+end

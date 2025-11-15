@@ -1,0 +1,30 @@
+# Coin Flip Simulator
+# Simulate multiple coin flips
+
+ask "How many flips?"
+set flips to answer
+
+set heads to 0
+set tails to 0
+
+for i from 1 to flips
+  set flip to (random from 1 to 2)
+
+  if flip = 1 then
+    change heads by 1
+  else
+    change tails by 1
+  end
+end
+
+say ""
+say "=== Results ==="
+say join "Flips: " and flips
+say join "Heads: " and heads
+say join "Tails: " and tails
+
+set headsPercent to heads * 100 / flips
+set tailsPercent to tails * 100 / flips
+
+say join "Heads: " and join headsPercent and "%"
+say join "Tails: " and join tailsPercent and "%"

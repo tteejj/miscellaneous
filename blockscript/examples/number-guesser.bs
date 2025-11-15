@@ -1,0 +1,51 @@
+# Number Guesser (Reverse)
+# Computer guesses YOUR number
+
+say "Think of a number between 1 and 100"
+say "Don't tell me what it is!"
+say ""
+say "When I guess, tell me:"
+say "  'higher' if your number is higher"
+say "  'lower' if your number is lower"
+say "  'correct' if I got it!"
+say ""
+ask "Ready? Press enter to start..."
+
+set low to 1
+set high to 100
+set guesses to 0
+set found to false
+
+while not found then
+  set guess to (low + high) / 2
+  set guess to (round guess)
+
+  change guesses by 1
+
+  say ""
+  ask join "Is your number " and join guess and "? (higher/lower/correct)"
+  set response to answer
+
+  if response = "correct" then
+    say ""
+    say join "I found it in " and join guesses and " guesses!"
+    set found to true
+  else
+    if response = "higher" then
+      set low to guess + 1
+    else
+      if response = "lower" then
+        set high to guess - 1
+      else
+        say "Please answer: higher, lower, or correct"
+        change guesses by -1
+      end
+    end
+  end
+
+  if (low > high) and not found then
+    say ""
+    say "Wait... I think you changed your number!"
+    set found to true
+  end
+end

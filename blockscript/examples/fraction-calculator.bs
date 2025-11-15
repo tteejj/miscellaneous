@@ -1,0 +1,41 @@
+# Fraction Calculator
+# Add and simplify fractions
+
+define gcd with a, b
+  while b != 0 then
+    set temp to b
+    set b to a mod b
+    set a to temp
+  end
+  return a
+end
+
+define simplify with num, den
+  set g to (call gcd with num, den)
+  set num to num / g
+  set den to den / g
+
+  say join num and join "/" and den
+end
+
+say "Fraction Calculator"
+say "Add two fractions"
+
+ask "First fraction numerator:"
+set num1 to answer
+
+ask "First fraction denominator:"
+set den1 to answer
+
+ask "Second fraction numerator:"
+set num2 to answer
+
+ask "Second fraction denominator:"
+set den2 to answer
+
+# Add fractions: a/b + c/d = (ad + bc) / bd
+set resultNum to num1 * den2 + num2 * den1
+set resultDen to den1 * den2
+
+say "Result:"
+call simplify with resultNum, resultDen

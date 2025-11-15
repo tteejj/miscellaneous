@@ -1,0 +1,21 @@
+# Age Calculator
+# Calculate age from birth year
+
+say "Age Calculator"
+
+ask "What year is it now?"
+set currentYear to answer
+
+ask "What year were you born?"
+set birthYear to answer
+
+set age to currentYear - birthYear
+
+say join "You are " and join age and " years old"
+
+# Calculate in months and days (approximate)
+set months to age * 12
+set days to age * 365
+
+say join "That's approximately " and join months and " months"
+say join "Or about " and join days and " days"

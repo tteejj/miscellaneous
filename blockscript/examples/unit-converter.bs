@@ -1,0 +1,55 @@
+# Unit Converter
+# Convert between different units
+
+say "Unit Converter"
+say "1. Miles to Kilometers"
+say "2. Kilometers to Miles"
+say "3. Pounds to Kilograms"
+say "4. Kilograms to Pounds"
+say "5. Fahrenheit to Celsius"
+say "6. Celsius to Fahrenheit"
+
+ask "Choose conversion:"
+set choice to answer
+
+if choice = 1 then
+  ask "Miles:"
+  set miles to answer
+  set km to miles * 1.60934
+  say join miles and join " miles = " and join km and " km"
+end
+
+if choice = 2 then
+  ask "Kilometers:"
+  set km to answer
+  set miles to km / 1.60934
+  say join km and join " km = " and join miles and " miles"
+end
+
+if choice = 3 then
+  ask "Pounds:"
+  set lbs to answer
+  set kg to lbs * 0.453592
+  say join lbs and join " lbs = " and join kg and " kg"
+end
+
+if choice = 4 then
+  ask "Kilograms:"
+  set kg to answer
+  set lbs to kg / 0.453592
+  say join kg and join " kg = " and join lbs and " lbs"
+end
+
+if choice = 5 then
+  ask "Fahrenheit:"
+  set f to answer
+  set c to (f - 32) * 5 / 9
+  say join f and join "°F = " and join c and "°C"
+end
+
+if choice = 6 then
+  ask "Celsius:"
+  set c to answer
+  set f to c * 9 / 5 + 32
+  say join c and join "°C = " and join f and "°F"
+end

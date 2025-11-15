@@ -1,0 +1,33 @@
+# Letter Frequency Counter
+# Count occurrences of each letter
+
+ask "Enter text:"
+set text to answer
+
+say "Letter frequencies:"
+
+# Count a-z (simplified)
+create list letters
+add "a" to letters
+add "b" to letters
+add "c" to letters
+add "d" to letters
+add "e" to letters
+
+for i from 1 to (length of letters)
+  set letter to (item i of letters)
+  set count to 0
+
+  set len to (length of text)
+  for j from 1 to len
+    set char to (letter j of text)
+
+    if char = letter then
+      change count by 1
+    end
+  end
+
+  if count > 0 then
+    print join letter and join ": " and count
+  end
+end

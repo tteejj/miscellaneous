@@ -1,0 +1,33 @@
+# Armstrong Number Checker
+# Check if a number equals the sum of its digits raised to the power of the number of digits
+
+ask "Enter a number:"
+set num to answer
+set original to num
+
+# Count digits
+set temp to num
+set digits to 0
+while temp > 0 then
+  change digits by 1
+  set temp to temp / 10
+  set temp to (floor temp)
+end
+
+# Calculate sum
+set sum to 0
+set temp to num
+
+while temp > 0 then
+  set digit to temp mod 10
+  set power to digit ^ digits
+  change sum by power
+  set temp to temp / 10
+  set temp to (floor temp)
+end
+
+if sum = original then
+  say join original and " is an Armstrong number!"
+else
+  say join original and " is not an Armstrong number."
+end

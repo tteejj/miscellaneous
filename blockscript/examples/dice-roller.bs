@@ -1,0 +1,52 @@
+# Dice Roller
+# Roll dice for games
+
+say "Dice Roller"
+say "Commands: roll, stats, quit"
+
+set running to true
+create list history
+
+while running then
+  ask "Command:"
+  set cmd to answer
+
+  if cmd = "roll" then
+    ask "How many dice?"
+    set numDice to answer
+
+    ask "Sides per die?"
+    set sides to answer
+
+    set total to 0
+
+    say "Rolling..."
+    for i from 1 to numDice
+      set roll to (random from 1 to sides)
+      print join "Die " and join i and join ": " and roll
+      change total by roll
+      add roll to history
+    end
+
+    say join "Total: " and total
+  end
+
+  if cmd = "stats" then
+    if (length of history) = 0 then
+      say "No rolls yet!"
+    else
+      set sum to 0
+      for i from 1 to (length of history)
+        change sum by (item i of history)
+      end
+
+      set avg to sum / (length of history)
+      say join "Total rolls: " and (length of history)
+      say join "Average: " and avg
+    end
+  end
+
+  if cmd = "quit" then
+    set running to false
+  end
+end

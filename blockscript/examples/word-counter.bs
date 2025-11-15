@@ -1,0 +1,68 @@
+# Word Counter
+# Count words, characters, and sentences
+
+define countWords with text
+  set words to 0
+  set inWord to false
+  set len to (length of text)
+
+  for i from 1 to len
+    set char to (letter i of text)
+
+    if char = " " then
+      set inWord to false
+    else
+      if not inWord then
+        change words by 1
+        set inWord to true
+      end
+    end
+  end
+
+  return words
+end
+
+define countSentences with text
+  set sentences to 0
+  set len to (length of text)
+
+  for i from 1 to len
+    set char to (letter i of text)
+
+    if char = "." then
+      change sentences by 1
+    end
+
+    if char = "!" then
+      change sentences by 1
+    end
+
+    if char = "?" then
+      change sentences by 1
+    end
+  end
+
+  return sentences
+end
+
+say "Word Counter"
+say ""
+
+ask "Enter your text:"
+set text to answer
+
+set chars to (length of text)
+set words to (call countWords with text)
+set sentences to (call countSentences with text)
+
+say ""
+say "=== Statistics ==="
+say join "Characters: " and chars
+say join "Words: " and words
+say join "Sentences: " and sentences
+
+if words > 0 then
+  set avgWordLength to chars / words
+  set avgWordLength to (round avgWordLength)
+  say join "Average word length: " and join avgWordLength and " characters"
+end

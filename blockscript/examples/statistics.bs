@@ -1,0 +1,59 @@
+# Statistics Calculator
+# Calculate mean, median, mode
+
+create list numbers
+
+say "Statistics Calculator"
+say "Enter numbers (enter -999 to finish)"
+
+set entering to true
+
+while entering then
+  ask "Number:"
+  set num to answer
+
+  if num = -999 then
+    set entering to false
+  else
+    add num to numbers
+  end
+end
+
+if (length of numbers) = 0 then
+  say "No numbers entered!"
+else
+  # Calculate mean
+  set sum to 0
+  for i from 1 to (length of numbers)
+    change sum by (item i of numbers)
+  end
+  set mean to sum / (length of numbers)
+
+  # Find min and max
+  set min to (item 1 of numbers)
+  set max to (item 1 of numbers)
+
+  for i from 1 to (length of numbers)
+    set num to (item i of numbers)
+
+    if num < min then
+      set min to num
+    end
+
+    if num > max then
+      set max to num
+    end
+  end
+
+  # Calculate range
+  set range to max - min
+
+  say ""
+  say "=== Statistics ==="
+  say join "Count: " and (length of numbers)
+  say join "Mean: " and mean
+  say join "Min: " and min
+  say join "Max: " and max
+  say join "Range: " and range
+  say join "Sum: " and sum
+end

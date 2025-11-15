@@ -1,0 +1,33 @@
+# Compound Interest Calculator
+# Calculate investment growth
+
+say "Compound Interest Calculator"
+
+ask "Principal amount:"
+set principal to answer
+
+ask "Annual interest rate (%):"
+set rate to answer
+
+ask "Time period (years):"
+set time to answer
+
+ask "Compounds per year:"
+set n to answer
+
+# A = P(1 + r/n)^(nt)
+set r to rate / 100
+set ratePerPeriod to r / n
+set periods to n * time
+
+set onePlus to 1 + ratePerPeriod
+set amount to principal * (onePlus ^ periods)
+set amount to (round amount)
+
+set interest to amount - principal
+
+say ""
+say "=== Results ==="
+say join "Initial: $" and principal
+say join "Final: $" and amount
+say join "Interest: $" and interest

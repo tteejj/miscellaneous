@@ -1,0 +1,38 @@
+# Quadratic Equation Solver
+# Solve ax² + bx + c = 0
+
+say "Quadratic Equation Solver"
+say "Solve: ax² + bx + c = 0"
+
+ask "Enter a:"
+set a to answer
+
+ask "Enter b:"
+set b to answer
+
+ask "Enter c:"
+set c to answer
+
+# Calculate discriminant
+set discriminant to b * b - 4 * a * c
+
+if discriminant > 0 then
+  say "Two real solutions:"
+
+  set sqrtD to (sqrt of discriminant)
+
+  set x1 to (0 - b + sqrtD) / (2 * a)
+  set x2 to (0 - b - sqrtD) / (2 * a)
+
+  say join "x1 = " and x1
+  say join "x2 = " and x2
+else
+  if discriminant = 0 then
+    say "One real solution:"
+
+    set x to (0 - b) / (2 * a)
+    say join "x = " and x
+  else
+    say "No real solutions (complex roots)"
+  end
+end

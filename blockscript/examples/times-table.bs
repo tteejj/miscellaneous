@@ -1,0 +1,50 @@
+# Multiplication Times Table
+# Display full times table
+
+ask "Times table up to:"
+set max to answer
+
+# Header
+set header to "   |"
+for i from 1 to max
+  set num to ""
+  if i < 10 then
+    set num to join " " and i
+  else
+    set num to i
+  end
+  set header to join header and join "  " and num
+end
+print header
+
+# Separator
+set sep to "---|"
+for i from 1 to max
+  set sep to join sep and "----"
+end
+print sep
+
+# Rows
+for row from 1 to max
+  set line to ""
+  if row < 10 then
+    set line to join " " and join row and " |"
+  else
+    set line to join row and " |"
+  end
+
+  for col from 1 to max
+    set product to row * col
+    if product < 10 then
+      set line to join line and join "   " and product
+    else
+      if product < 100 then
+        set line to join line and join "  " and product
+      else
+        set line to join line and join " " and product
+      end
+    end
+  end
+
+  print line
+end

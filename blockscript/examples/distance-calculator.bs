@@ -1,0 +1,28 @@
+# Distance Calculator
+# Calculate distance between two points
+
+say "Distance Calculator (2D)"
+
+ask "Point 1 X:"
+set x1 to answer
+
+ask "Point 1 Y:"
+set y1 to answer
+
+ask "Point 2 X:"
+set x2 to answer
+
+ask "Point 2 Y:"
+set y2 to answer
+
+# Distance = √((x2-x1)² + (y2-y1)²)
+set dx to x2 - x1
+set dy to y2 - y1
+
+set dxSquared to dx * dx
+set dySquared to dy * dy
+
+set sum to dxSquared + dySquared
+set distance to (sqrt of sum)
+
+say join "Distance: " and distance

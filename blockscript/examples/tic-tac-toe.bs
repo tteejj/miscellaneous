@@ -1,0 +1,138 @@
+# Tic-Tac-Toe Game
+# Play against the computer
+
+create list board
+set count to 1
+while count <= 9 then
+  add "-" to board
+  change count by 1
+end
+
+define showBoard
+  say "Current Board:"
+  set row1 to join (item 1 of board) and join " | " and join (item 2 of board) and join " | " and (item 3 of board)
+  set row2 to join (item 4 of board) and join " | " and join (item 5 of board) and join " | " and (item 6 of board)
+  set row3 to join (item 7 of board) and join " | " and join (item 8 of board) and join " | " and (item 9 of board)
+  print row1
+  print "---------"
+  print row2
+  print "---------"
+  print row3
+end
+
+define checkWin with player
+  # Check rows
+  if ((item 1 of board) = player) and ((item 2 of board) = player) and ((item 3 of board) = player) then
+    return true
+  end
+  if ((item 4 of board) = player) and ((item 5 of board) = player) and ((item 6 of board) = player) then
+    return true
+  end
+  if ((item 7 of board) = player) and ((item 8 of board) = player) and ((item 9 of board) = player) then
+    return true
+  end
+
+  # Check columns
+  if ((item 1 of board) = player) and ((item 4 of board) = player) and ((item 7 of board) = player) then
+    return true
+  end
+  if ((item 2 of board) = player) and ((item 5 of board) = player) and ((item 8 of board) = player) then
+    return true
+  end
+  if ((item 3 of board) = player) and ((item 6 of board) = player) and ((item 9 of board) = player) then
+    return true
+  end
+
+  # Check diagonals
+  if ((item 1 of board) = player) and ((item 5 of board) = player) and ((item 9 of board) = player) then
+    return true
+  end
+  if ((item 3 of board) = player) and ((item 5 of board) = player) and ((item 7 of board) = player) then
+    return true
+  end
+
+  return false
+end
+
+define isBoardFull
+  for i from 1 to 9
+    if (item i of board) = "-" then
+      return false
+    end
+  end
+  return true
+end
+
+define computerMove
+  # Simple AI: random available move
+  set moved to false
+  while not moved then
+    set pos to (random from 1 to 9)
+    if (item pos of board) = "-" then
+      set item pos of board to "O"
+      set moved to true
+    end
+  end
+end
+
+say "Welcome to Tic-Tac-Toe!"
+say "You are X, computer is O"
+say "Positions are numbered 1-9:"
+say "1 | 2 | 3"
+say "4 | 5 | 6"
+say "7 | 8 | 9"
+
+set gameOver to false
+
+while not gameOver then
+  call showBoard
+
+  # Player move
+  ask "Enter your move (1-9):"
+  set move to answer
+
+  if (move >= 1) and (move <= 9) then
+    if (item move of board) = "-" then
+      set item move of board to "X"
+
+      # Check win
+      set playerWon to (call checkWin with "X")
+      if playerWon then
+        call showBoard
+        say "You win!"
+        set gameOver to true
+      else
+        # Check tie
+        set full to (call isBoardFull)
+        if full then
+          call showBoard
+          say "It's a tie!"
+          set gameOver to true
+        else
+          # Computer move
+          call computerMove
+
+          set computerWon to (call checkWin with "O")
+          if computerWon then
+            call showBoard
+            say "Computer wins!"
+            set gameOver to true
+          else
+            set full to (call isBoardFull)
+            if full then
+              call showBoard
+              say "It's a tie!"
+              set gameOver to true
+            end
+          end
+        end
+      end
+    else
+      say "That spot is taken!"
+    end
+  else
+    say "Invalid move! Enter 1-9"
+  end
+end
+
+say "Game Over!"

@@ -1,0 +1,68 @@
+# Binary Converter
+# Convert between decimal and binary
+
+define decimalToBinary with decimal
+  if decimal = 0 then
+    return "0"
+  end
+
+  create list digits
+  set num to decimal
+
+  while num > 0 then
+    set remainder to num mod 2
+    add remainder to digits
+    set num to num / 2
+    set num to (floor num)
+  end
+
+  # Reverse the digits
+  set binary to ""
+  set len to (length of digits)
+  for i from len to 1
+    set digit to (item i of digits)
+    set binary to join binary and digit
+  end
+
+  return binary
+end
+
+define binaryToDecimal with binary
+  set decimal to 0
+  set len to (length of binary)
+  set power to 0
+
+  for i from len to 1
+    set digit to (letter i of binary)
+    if digit = "1" then
+      set value to 2 ^ power
+      change decimal by value
+    end
+    change power by 1
+  end
+
+  return decimal
+end
+
+say "Binary Converter"
+say ""
+say "1. Decimal to Binary"
+say "2. Binary to Decimal"
+say ""
+
+ask "Choose option (1 or 2):"
+set choice to answer
+
+if choice = 1 then
+  ask "Enter decimal number:"
+  set decimal to answer
+  set binary to (call decimalToBinary with decimal)
+  say join decimal and join " in binary is: " and binary
+end
+
+if choice = 2 then
+  ask "Enter binary number:"
+  set binary to answer
+  set decimal to (call binaryToDecimal with binary)
+  say join binary and join " in decimal is: " and decimal
+end

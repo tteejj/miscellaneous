@@ -1,0 +1,26 @@
+# Number Pyramid
+# Display a pyramid of numbers
+
+ask "Pyramid height:"
+set height to answer
+
+for row from 1 to height
+  set line to ""
+
+  # Spaces
+  for i from 1 to (height - row)
+    set line to join line and " "
+  end
+
+  # Numbers ascending
+  for i from 1 to row
+    set line to join line and i
+  end
+
+  # Numbers descending
+  for i from (row - 1) to 1
+    set line to join line and i
+  end
+
+  print line
+end

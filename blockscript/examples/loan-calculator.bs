@@ -1,0 +1,41 @@
+# Loan Calculator
+# Calculate monthly payments
+
+say "Loan Calculator"
+
+ask "Loan amount:"
+set principal to answer
+
+ask "Annual interest rate (%):"
+set annualRate to answer
+
+ask "Loan term (years):"
+set years to answer
+
+# Convert to monthly
+set monthlyRate to annualRate / 100 / 12
+set months to years * 12
+
+# Calculate payment using formula
+# M = P * (r(1+r)^n) / ((1+r)^n - 1)
+
+set onePlusR to 1 + monthlyRate
+set power to onePlusR ^ months
+set numerator to monthlyRate * power
+set denominator to power - 1
+
+if denominator != 0 then
+  set payment to principal * numerator / denominator
+  set payment to (round payment)
+
+  set totalPaid to payment * months
+  set totalInterest to totalPaid - principal
+
+  say ""
+  say "=== Results ==="
+  say join "Monthly Payment: $" and payment
+  say join "Total Paid: $" and totalPaid
+  say join "Total Interest: $" and totalInterest
+else
+  say "Error calculating payment!"
+end

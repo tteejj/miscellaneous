@@ -1,0 +1,112 @@
+# Hangman Game
+# Classic word guessing game
+
+create list words
+add "python" to words
+add "javascript" to words
+add "blockscript" to words
+add "programming" to words
+add "computer" to words
+add "algorithm" to words
+add "function" to words
+add "variable" to words
+
+set wordIdx to (random from 1 to (length of words))
+set word to (item wordIdx of words)
+set wordLen to (length of word)
+
+create list guessed
+for i from 1 to wordLen
+  add "_" to guessed
+end
+
+create list usedLetters
+set lives to 6
+set gameOver to false
+
+say "Welcome to Hangman!"
+say join "The word has " and join wordLen and " letters"
+
+while not gameOver then
+  # Show current state
+  say ""
+  set display to ""
+  for i from 1 to (length of guessed)
+    set char to (item i of guessed)
+    set display to join display and join char and " "
+  end
+  say display
+
+  say join "Lives remaining: " and lives
+
+  # Show used letters
+  if (length of usedLetters) > 0 then
+    set used to ""
+    for i from 1 to (length of usedLetters)
+      set letter to (item i of usedLetters)
+      set used to join used and join letter and " "
+    end
+    say join "Used letters: " and used
+  end
+
+  # Get guess
+  ask "Guess a letter:"
+  set guess to answer
+  set guessLen to (length of guess)
+
+  if guessLen = 1 then
+    # Check if already used
+    set alreadyUsed to false
+    for i from 1 to (length of usedLetters)
+      if (item i of usedLetters) = guess then
+        set alreadyUsed to true
+      end
+    end
+
+    if alreadyUsed then
+      say "You already guessed that letter!"
+    else
+      add guess to usedLetters
+
+      # Check if letter is in word
+      set found to false
+      for i from 1 to wordLen
+        set wordChar to (letter i of word)
+        if wordChar = guess then
+          set item i of guessed to guess
+          set found to true
+        end
+      end
+
+      if found then
+        say "Correct!"
+
+        # Check if won
+        set won to true
+        for i from 1 to (length of guessed)
+          if (item i of guessed) = "_" then
+            set won to false
+          end
+        end
+
+        if won then
+          say ""
+          say join "Congratulations! The word was: " and word
+          set gameOver to true
+        end
+      else
+        say "Wrong!"
+        change lives by -1
+
+        if lives = 0 then
+          say ""
+          say "Game Over!"
+          say join "The word was: " and word
+          set gameOver to true
+        end
+      end
+    end
+  else
+    say "Please enter a single letter!"
+  end
+end

@@ -1,0 +1,24 @@
+# Palindrome Checker
+# Check if a word reads the same forwards and backwards
+
+ask "Enter a word:"
+set word to answer
+
+set len to (length of word)
+set isPalindrome to true
+
+for i from 1 to (len / 2)
+  set front to (letter i of word)
+  set backIdx to len - i + 1
+  set back to (letter backIdx of word)
+
+  if front != back then
+    set isPalindrome to false
+  end
+end
+
+if isPalindrome then
+  say join word and " is a palindrome!"
+else
+  say join word and " is not a palindrome."
+end

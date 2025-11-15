@@ -1,0 +1,31 @@
+# Factorial Calculator
+# Calculate factorials
+
+define factorial with n
+  if n <= 1 then
+    return 1
+  end
+
+  set result to 1
+  for i from 2 to n
+    change result by (result * (i - 1))
+    set result to result * i / i  # Simplified
+  end
+
+  # Simpler approach
+  set result to 1
+  for i from 1 to n
+    set result to result * i
+  end
+
+  return result
+end
+
+say "Factorial Calculator"
+ask "Calculate factorial up to:"
+set max to answer
+
+for i from 1 to max
+  set fact to (call factorial with i)
+  print join i and join "! = " and fact
+end

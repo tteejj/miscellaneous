@@ -1,0 +1,34 @@
+# Roman Numeral Converter
+# Convert numbers to Roman numerals (1-20)
+
+ask "Enter a number (1-20):"
+set num to answer
+
+set roman to ""
+
+if num >= 10 then
+  set roman to "X"
+  change num by -10
+end
+
+if num = 9 then
+  set roman to join roman and "IX"
+  set num to 0
+end
+
+if num >= 5 then
+  set roman to join roman and "V"
+  change num by -5
+end
+
+if num = 4 then
+  set roman to join roman and "IV"
+  set num to 0
+end
+
+while num > 0 then
+  set roman to join roman and "I"
+  change num by -1
+end
+
+say join "Roman numeral: " and roman

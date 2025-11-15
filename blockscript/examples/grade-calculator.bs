@@ -1,0 +1,84 @@
+# Grade Calculator
+# Calculate average and letter grade
+
+create list grades
+
+say "Grade Calculator"
+say "Enter grades (enter -1 to finish)"
+
+set entering to true
+
+while entering then
+  ask "Enter grade (0-100):"
+  set grade to answer
+
+  if grade = -1 then
+    set entering to false
+  else
+    if (grade >= 0) and (grade <= 100) then
+      add grade to grades
+    else
+      say "Invalid grade!"
+    end
+  end
+end
+
+if (length of grades) = 0 then
+  say "No grades entered!"
+else
+  # Calculate average
+  set sum to 0
+  for i from 1 to (length of grades)
+    set grade to (item i of grades)
+    change sum by grade
+  end
+
+  set avg to sum / (length of grades)
+  set avg to (round avg)
+
+  # Determine letter grade
+  set letter to ""
+
+  if avg >= 90 then
+    set letter to "A"
+  else
+    if avg >= 80 then
+      set letter to "B"
+    else
+      if avg >= 70 then
+        set letter to "C"
+      else
+        if avg >= 60 then
+          set letter to "D"
+        else
+          set letter to "F"
+        end
+      end
+    end
+  end
+
+  say ""
+  say "=== Results ==="
+  say join "Number of grades: " and (length of grades)
+  say join "Average: " and avg
+  say join "Letter Grade: " and letter
+
+  # Find min and max
+  set min to (item 1 of grades)
+  set max to (item 1 of grades)
+
+  for i from 1 to (length of grades)
+    set grade to (item i of grades)
+
+    if grade < min then
+      set min to grade
+    end
+
+    if grade > max then
+      set max to grade
+    end
+  end
+
+  say join "Lowest: " and min
+  say join "Highest: " and max
+end

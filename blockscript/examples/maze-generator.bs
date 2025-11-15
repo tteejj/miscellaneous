@@ -1,0 +1,78 @@
+# Maze Generator
+# Generate and display a simple maze
+
+define createMaze with width, height
+  create list maze
+
+  # Initialize maze with walls
+  set total to width * height
+  for i from 1 to total
+    add "#" to maze
+  end
+
+  # Carve passages (simple random walk)
+  set x to 1
+  set y to 1
+  set pos to (y - 1) * width + x
+  set item pos of maze to " "
+
+  for step from 1 to (total / 2)
+    set dir to (random from 1 to 4)
+
+    if dir = 1 then
+      # Up
+      if y > 1 then
+        change y by -1
+      end
+    end
+
+    if dir = 2 then
+      # Down
+      if y < height then
+        change y by 1
+      end
+    end
+
+    if dir = 3 then
+      # Left
+      if x > 1 then
+        change x by -1
+      end
+    end
+
+    if dir = 4 then
+      # Right
+      if x < width then
+        change x by 1
+      end
+    end
+
+    set pos to (y - 1) * width + x
+    set item pos of maze to " "
+  end
+
+  return maze
+end
+
+define displayMaze with maze, width, height
+  for y from 1 to height
+    set row to ""
+    for x from 1 to width
+      set pos to (y - 1) * width + x
+      set cell to (item pos of maze)
+      set row to join row and cell
+    end
+    print row
+  end
+end
+
+say "Maze Generator"
+
+set w to 20
+set h to 10
+
+say "Generating maze..."
+set maze to (call createMaze with w, h)
+
+say ""
+call displayMaze with maze, w, h

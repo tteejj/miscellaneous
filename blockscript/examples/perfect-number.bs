@@ -1,0 +1,32 @@
+# Perfect Number Checker
+# A perfect number equals the sum of its divisors
+
+define isPerfect with num
+  set sum to 0
+
+  for i from 1 to (num - 1)
+    if (num mod i) = 0 then
+      change sum by i
+    end
+  end
+
+  if sum = num then
+    return true
+  else
+    return false
+  end
+end
+
+say "Perfect Number Finder"
+ask "Check numbers up to:"
+set max to answer
+
+say "Perfect numbers:"
+
+for i from 1 to max
+  set perfect to (call isPerfect with i)
+
+  if perfect then
+    print i
+  end
+end

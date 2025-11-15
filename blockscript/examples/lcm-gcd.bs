@@ -1,0 +1,29 @@
+# LCM and GCD Calculator
+# Find Least Common Multiple and Greatest Common Divisor
+
+define gcd with a, b
+  while b != 0 then
+    set temp to b
+    set b to a mod b
+    set a to temp
+  end
+  return a
+end
+
+define lcm with a, b
+  set g to (call gcd with a, b)
+  set result to (a * b) / g
+  return result
+end
+
+ask "First number:"
+set num1 to answer
+
+ask "Second number:"
+set num2 to answer
+
+set g to (call gcd with num1, num2)
+set l to (call lcm with num1, num2)
+
+say join "GCD: " and g
+say join "LCM: " and l

@@ -1,0 +1,44 @@
+# Area Calculator
+# Calculate areas of various shapes
+
+say "Area Calculator"
+say "1. Circle"
+say "2. Rectangle"
+say "3. Triangle"
+say "4. Square"
+
+ask "Choose shape:"
+set choice to answer
+
+if choice = 1 then
+  ask "Radius:"
+  set r to answer
+  set pi to 3.14159
+  set area to pi * r * r
+  say join "Area: " and area
+end
+
+if choice = 2 then
+  ask "Width:"
+  set w to answer
+  ask "Height:"
+  set h to answer
+  set area to w * h
+  say join "Area: " and area
+end
+
+if choice = 3 then
+  ask "Base:"
+  set b to answer
+  ask "Height:"
+  set h to answer
+  set area to b * h / 2
+  say join "Area: " and area
+end
+
+if choice = 4 then
+  ask "Side length:"
+  set s to answer
+  set area to s * s
+  say join "Area: " and area
+end

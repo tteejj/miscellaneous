@@ -1,0 +1,38 @@
+# Leap Year Lister
+# List all leap years in a range
+
+define isLeapYear with year
+  set leap to false
+
+  if (year mod 4) = 0 then
+    if (year mod 100) = 0 then
+      if (year mod 400) = 0 then
+        set leap to true
+      end
+    else
+      set leap to true
+    end
+  end
+
+  return leap
+end
+
+ask "Start year:"
+set start to answer
+
+ask "End year:"
+set end to answer
+
+say "Leap years:"
+
+set count to 0
+for year from start to end
+  set isLeap to (call isLeapYear with year)
+
+  if isLeap then
+    print year
+    change count by 1
+  end
+end
+
+say join "Total: " and join count and " leap years"

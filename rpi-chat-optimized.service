@@ -1,0 +1,56 @@
+[Unit]
+Description=RPI Chat Server (Optimized for Pi Zero 2 W)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/rpi-chat
+
+# Environment variables
+Environment="FLASK_APP=server.py"
+Environment="DATABASE_PATH=/home/pi/rpi-chat/data/chat.db"
+Environment="UPLOAD_FOLDER=/home/pi/rpi-chat/uploads"
+Environment="TMP_FOLDER=/dev/shm/rpi-chat-tmp"
+Environment="PYTHONUNBUFFERED=1"
+
+# Create temporary directory in RAM
+ExecStartPre=/bin/mkdir -p /dev/shm/rpi-chat-tmp
+ExecStartPre=/bin/chown pi:pi /dev/shm/rpi-chat-tmp
+
+# Run with gunicorn (2 workers for Pi Zero)
+ExecStart=/home/pi/rpi-chat/venv/bin/gunicorn \
+    --bind 0.0.0.0:5000 \
+    --workers 2 \
+    --worker-class gthread \
+    --threads 2 \
+    --worker-tmp-dir /dev/shm \
+    --access-logfile /var/log/rpi-chat/access.log \
+    --error-logfile /var/log/rpi-chat/error.log \
+    --log-level info \
+    --timeout 120 \
+    server:app
+
+# Cleanup on stop
+ExecStopPost=/bin/rm -rf /dev/shm/rpi-chat-tmp
+
+# Restart policy
+Restart=always
+RestartSec=5
+
+# Resource limits (important for Pi Zero 2 W)
+MemoryLimit=256M
+CPUQuota=200%
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging (rate limited to reduce SD writes)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rpi-chat
+
+[Install]
+WantedBy=multi-user.target

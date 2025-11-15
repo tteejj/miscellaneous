@@ -1,0 +1,68 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Data and uploads (mounted as volumes)
+data/
+uploads/
+*.db
+*.db-shm
+*.db-wal
+
+# Documentation
+*.md
+PULL_REQUEST.md
+README.md
+QUICKSTART.md
+INSTALL.md
+DEPLOYMENT-GUIDE.md
+DIETPI-QUICKSTART.md
+
+# Installation scripts (not needed in container)
+install.sh
+setup.sh
+reset-setup.sh
+*.service
+
+# Testing
+tests/
+test_*.py
+.pytest_cache
+.coverage
+
+# Logs
+*.log
+logs/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker/Podman
+Containerfile*
+compose*.yaml
+.containerignore

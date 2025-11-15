@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  rpi-chat:
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: rpi-chat
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"
+
+    # CRITICAL: tmpfs mounts to reduce SD card writes on Pi Zero
+    tmpfs:
+      # Temporary files in memory
+      - /app/tmp:size=50M,mode=1777
+      # Gunicorn worker tmp files
+      - /dev/shm:size=64M
+
+    volumes:
+      # Persistent data on SD card (only database and uploads)
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      # Optional: Use named volumes instead
+      # - chat-data:/app/data
+      # - chat-uploads:/app/uploads
+
+    environment:
+      # Flask settings
+      - FLASK_APP=server.py
+      - DATABASE_PATH=/app/data/chat.db
+      - UPLOAD_FOLDER=/app/uploads
+      - TMP_FOLDER=/app/tmp
+
+      # Performance tuning for Pi Zero 2 W
+      - PYTHONUNBUFFERED=1
+      - MALLOC_TRIM_THRESHOLD_=100000
+
+      # Security
+      - SESSION_COOKIE_SECURE=false  # Set true if using HTTPS
+      - SESSION_COOKIE_HTTPONLY=true
+      - SESSION_COOKIE_SAMESITE=Lax
+
+    # Resource limits for Pi Zero 2 W (512MB RAM total)
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '2.0'
+        reservations:
+          memory: 128M
+          cpus: '1.0'
+
+    # Logging - send to journald to avoid SD writes
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "2"
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Network
+    networks:
+      - rpi-chat-network
+
+networks:
+  rpi-chat-network:
+    driver: bridge
+
+# Optional: Named volumes for better management
+# volumes:
+#   chat-data:
+#   chat-uploads:

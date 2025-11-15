@@ -13,6 +13,9 @@ import json
 import secrets
 import time
 import mimetypes
+import base64
+from io import BytesIO
+from collections import defaultdict
 from datetime import datetime, timedelta
 from PIL import Image
 from database import DB_PATH, init_db
@@ -48,11 +51,45 @@ os.makedirs(AVATARS_FOLDER, exist_ok=True)
 message_queues = {}
 queue_lock = threading.Lock()
 
+# In-memory caches for reducing SD card writes (critical for Pi Zero)
+presence_cache = {}  # {(user_id, channel_id): timestamp}
+rate_limit_cache = defaultdict(list)  # {(user_id, action): [timestamps]}
+cache_lock = threading.Lock()
+
+# Background thread to persist presence cache every 5 minutes
+def persist_presence_cache():
+    """Periodically persist presence cache to database"""
+    while True:
+        time.sleep(300)  # 5 minutes
+        try:
+            with cache_lock:
+                if not presence_cache:
+                    continue
+
+                conn = get_db()
+                cursor = conn.cursor()
+                for (user_id, channel_id), timestamp in presence_cache.items():
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO user_presence (user_id, channel_id, last_seen) VALUES (?, ?, ?)",
+                        (user_id, channel_id, datetime.fromtimestamp(timestamp))
+                    )
+                conn.commit()
+                conn.close()
+        except Exception as e:
+            print(f"Error persisting presence cache: {e}")
+
+# Start background persistence thread
+persistence_thread = threading.Thread(target=persist_presence_cache, daemon=True)
+persistence_thread.start()
+
 
 def get_db():
-    """Get database connection"""
+    """Get database connection with optimizations"""
     conn = sqlite3.connect(DB_PATH, timeout=10.0)
     conn.row_factory = sqlite3.Row
+    # Enable WAL mode for better concurrency (should already be set, but ensure it)
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA synchronous=NORMAL')
     return conn
 
 
@@ -127,66 +164,55 @@ def detect_message_type(content):
 
 
 def check_rate_limit(user_id, action='message'):
-    """Check if user has exceeded rate limit"""
-    conn = get_db()
-    cursor = conn.cursor()
+    """Check if user has exceeded rate limit (in-memory for Pi Zero optimization)"""
+    now = time.time()
+    cache_key = (user_id, action)
 
-    # Clean up old entries
-    cutoff = datetime.now() - timedelta(seconds=RATE_LIMIT_WINDOW)
-    cursor.execute('''
-        DELETE FROM rate_limits
-        WHERE timestamp < ?
-    ''', (cutoff,))
+    with cache_lock:
+        # Clean up old entries
+        rate_limit_cache[cache_key] = [
+            ts for ts in rate_limit_cache[cache_key]
+            if now - ts < RATE_LIMIT_WINDOW
+        ]
 
-    # Count recent actions
-    cursor.execute('''
-        SELECT COUNT(*) FROM rate_limits
-        WHERE user_id = ? AND action = ? AND timestamp > ?
-    ''', (user_id, action, cutoff))
-
-    count = cursor.fetchone()[0]
-    conn.commit()
-    conn.close()
-
-    return count < RATE_LIMIT_MESSAGES
+        # Check count
+        return len(rate_limit_cache[cache_key]) < RATE_LIMIT_MESSAGES
 
 
 def record_rate_limit(user_id, action='message'):
-    """Record a rate-limited action"""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO rate_limits (user_id, action, timestamp)
-        VALUES (?, ?, ?)
-    ''', (user_id, action, datetime.now()))
-    conn.commit()
-    conn.close()
+    """Record a rate-limited action (in-memory for Pi Zero optimization)"""
+    cache_key = (user_id, action)
+    with cache_lock:
+        rate_limit_cache[cache_key].append(time.time())
 
 
 def update_user_presence(user_id, channel_id):
-    """Update user's last seen timestamp"""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT OR REPLACE INTO user_presence (user_id, channel_id, last_seen)
-        VALUES (?, ?, ?)
-    ''', (user_id, channel_id, datetime.now()))
-    conn.commit()
-    conn.close()
+    """Update user's last seen timestamp (in-memory for Pi Zero optimization)"""
+    with cache_lock:
+        presence_cache[(user_id, channel_id)] = time.time()
 
 
 def get_active_users(channel_id, minutes=5):
-    """Get users active in the last N minutes"""
+    """Get users active in the last N minutes (checks in-memory cache first)"""
+    cutoff_timestamp = time.time() - (minutes * 60)
+    active_user_ids = set()
+
+    # Check in-memory cache first
+    with cache_lock:
+        for (user_id, ch_id), timestamp in presence_cache.items():
+            if ch_id == channel_id and timestamp > cutoff_timestamp:
+                active_user_ids.add(user_id)
+
+    # Get user details from database
+    if not active_user_ids:
+        return []
+
     conn = get_db()
     cursor = conn.cursor()
-    cutoff = datetime.now() - timedelta(minutes=minutes)
-    cursor.execute('''
-        SELECT u.id, u.username, p.last_seen
-        FROM user_presence p
-        JOIN users u ON p.user_id = u.id
-        WHERE p.channel_id = ? AND p.last_seen > ?
-        ORDER BY p.last_seen DESC
-    ''', (channel_id, cutoff))
+    placeholders = ','.join('?' * len(active_user_ids))
+    cursor.execute(f'''
+        SELECT id, username FROM users WHERE id IN ({placeholders})
+    ''', tuple(active_user_ids))
     users = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return users
@@ -244,6 +270,34 @@ def optimize_image(filepath, max_size_mb=2):
 
     except Exception as e:
         print(f"Image optimization failed: {e}")
+
+
+def generate_micro_thumbnail(filepath, size=(20, 20)):
+    """Generate a tiny base64-encoded thumbnail for lazy loading placeholders"""
+    try:
+        with Image.open(filepath) as img:
+            # Create tiny thumbnail
+            img.thumbnail(size, Image.Resampling.LANCZOS)
+
+            # Save to bytes buffer
+            buffer = BytesIO()
+            # Convert to RGB if needed
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+
+            img.save(buffer, 'JPEG', quality=50, optimize=True)
+
+            # Encode as base64 data URL
+            img_str = base64.b64encode(buffer.getvalue()).decode()
+            return f"data:image/jpeg;base64,{img_str}"
+
+    except Exception as e:
+        print(f"Micro thumbnail generation error: {str(e)}")
+        return None
 
 
 def broadcast_message(channel_id, message_data):
@@ -483,6 +537,25 @@ def initial_setup():
             conn.close()
 
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for container orchestration"""
+    try:
+        # Quick database check
+        conn = get_db()
+        conn.execute('SELECT 1')
+        conn.close()
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/users', methods=['GET'])
 def get_users():
     """Get all users (admin only)"""
@@ -644,11 +717,16 @@ def create_channel():
 
 @app.route('/api/messages/<int:channel_id>', methods=['GET'])
 def get_messages(channel_id):
-    """Get messages for a specific channel"""
+    """Get messages for a specific channel with pagination support"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
     user_id = session['user_id']
+
+    # Pagination parameters
+    before_id = request.args.get('before', type=int)  # Message ID to load before
+    limit = request.args.get('limit', 50, type=int)  # Number of messages to load
+    limit = min(limit, 100)  # Cap at 100 messages per request
 
     # Update user presence
     update_user_presence(user_id, channel_id)
@@ -680,9 +758,9 @@ def get_messages(channel_id):
         else:
             break
 
-    # Get messages with user info including avatar color and avatar URL
-    cursor.execute('''
-        SELECT m.id, m.message_type, m.content, m.metadata, m.timestamp, m.user_id,
+    # Build query with optional pagination
+    query = '''
+        SELECT m.id, m.message_type, m.content, m.metadata, m.reply_to_id, m.timestamp, m.user_id,
                u.username, u.avatar_color, u.avatar_url,
                CASE WHEN me.message_id IS NOT NULL THEN 1 ELSE 0 END as edited,
                CASE WHEN pm.message_id IS NOT NULL THEN 1 ELSE 0 END as pinned
@@ -691,14 +769,29 @@ def get_messages(channel_id):
         LEFT JOIN (SELECT DISTINCT message_id FROM message_edits) me ON m.id = me.message_id
         LEFT JOIN pinned_messages pm ON m.id = pm.message_id
         WHERE m.channel_id = ?
-        ORDER BY m.timestamp ASC
-    ''', (channel_id,))
+    '''
+
+    params = [channel_id]
+
+    if before_id:
+        query += ' AND m.id < ?'
+        params.append(before_id)
+
+    query += ' ORDER BY m.timestamp DESC, m.id DESC LIMIT ?'
+    params.append(limit)
+
+    cursor.execute(query, params)
 
     messages = []
     message_ids = []
+    reply_to_ids = set()
+
     for row in cursor.fetchall():
         msg = dict(row)
         message_ids.append(msg['id'])
+
+        if msg['reply_to_id']:
+            reply_to_ids.add(msg['reply_to_id'])
 
         # Parse metadata if exists
         if msg['metadata']:
@@ -753,8 +846,36 @@ def get_messages(channel_id):
 
         messages.append(msg)
 
+    # Reverse messages to get chronological order (oldest first)
+    messages.reverse()
+
+    # Get reply context for threaded messages
+    reply_context = {}
+    if reply_to_ids:
+        placeholders = ','.join('?' * len(reply_to_ids))
+        cursor.execute(f'''
+            SELECT m.id, m.content, u.username, m.message_type
+            FROM messages m
+            JOIN users u ON m.user_id = u.id
+            WHERE m.id IN ({placeholders})
+        ''', tuple(reply_to_ids))
+        for row in cursor.fetchall():
+            reply_context[row['id']] = {
+                'content': row['content'][:100],  # First 100 chars
+                'username': row['username'],
+                'message_type': row['message_type']
+            }
+
+    # Add reply context to messages
+    for msg in messages:
+        if msg['reply_to_id'] and msg['reply_to_id'] in reply_context:
+            msg['reply_to'] = reply_context[msg['reply_to_id']]
+
     # Get active users
     active_users = get_active_users(channel_id)
+
+    # Check if there are more messages
+    has_more = len(messages) == limit
 
     # Get pinned messages
     cursor.execute('''
@@ -777,7 +898,9 @@ def get_messages(channel_id):
         'messages': messages,
         'total_image_size': total_size,
         'active_users': active_users,
-        'pinned_messages': pinned_ids
+        'pinned_messages': pinned_ids,
+        'has_more': has_more,
+        'oldest_id': messages[0]['id'] if messages else None
     })
 
 
@@ -794,6 +917,7 @@ def post_message(channel_id):
 
     data = request.get_json()
     content = data.get('message', '').strip()
+    reply_to_id = data.get('reply_to_id')  # Optional: for threading
     use_markdown = data.get('markdown', True)  # Enable markdown by default
 
     if not content:
@@ -815,9 +939,9 @@ def post_message(channel_id):
         return jsonify({'error': 'Channel not found'}), 404
 
     cursor.execute('''
-        INSERT INTO messages (channel_id, user_id, message_type, content, metadata)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (channel_id, user_id, message_type, content, metadata))
+        INSERT INTO messages (channel_id, user_id, message_type, content, metadata, reply_to_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (channel_id, user_id, message_type, content, metadata, reply_to_id))
     conn.commit()
     message_id = cursor.lastrowid
 
@@ -830,7 +954,7 @@ def post_message(channel_id):
 
     # Get the new message with user info
     cursor.execute('''
-        SELECT m.id, m.message_type, m.content, m.metadata, m.timestamp, m.user_id,
+        SELECT m.id, m.message_type, m.content, m.metadata, m.reply_to_id, m.timestamp, m.user_id,
                u.username, u.avatar_color, u.avatar_url
         FROM messages m
         JOIN users u ON m.user_id = u.id
@@ -937,7 +1061,7 @@ def upload_image(channel_id):
     # Optimize the original image
     optimize_image(filepath, max_size_mb=2)
 
-    # Create thumbnail
+    # Create thumbnail and micro thumbnail
     try:
         with Image.open(filepath) as img:
             # Get original dimensions
@@ -946,6 +1070,9 @@ def upload_image(channel_id):
             # Create thumbnail
             img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
             img.save(thumbnail_path, quality=85, optimize=True)
+
+        # Generate micro thumbnail (for lazy loading)
+        micro_thumb = generate_micro_thumbnail(filepath)
 
     except Exception as e:
         # Clean up on error
@@ -958,9 +1085,9 @@ def upload_image(channel_id):
     cursor = conn.cursor()
 
     cursor.execute('''
-        INSERT INTO images (channel_id, user_id, filename, thumbnail_filename, file_size, width, height)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (channel_id, user_id, filename, thumbnail_filename, file_size, width, height))
+        INSERT INTO images (channel_id, user_id, filename, thumbnail_filename, micro_thumbnail, file_size, width, height)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (channel_id, user_id, filename, thumbnail_filename, micro_thumb, file_size, width, height))
     image_id = cursor.lastrowid
 
     # Create message pointing to this image
@@ -1661,6 +1788,134 @@ def delete_event(event_id):
     conn.close()
 
     return jsonify({'success': True})
+
+
+@app.route('/api/polls/<int:channel_id>', methods=['POST'])
+def create_poll(channel_id):
+    """Create a poll in a channel"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    question = data.get('question', '').strip()
+    options = data.get('options', [])
+    expires_at = data.get('expires_at')
+
+    if not question or len(options) < 2:
+        return jsonify({'error': 'Question and at least 2 options required'}), 400
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        INSERT INTO polls (channel_id, user_id, question, options, expires_at)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (channel_id, user_id, question, json.dumps(options), expires_at))
+    poll_id = cursor.lastrowid
+    conn.commit()
+
+    # Broadcast poll creation
+    poll_data = get_poll_data(cursor, poll_id, user_id)
+    conn.close()
+
+    broadcast_message(channel_id, {
+        'type': 'poll',
+        'data': poll_data
+    })
+
+    return jsonify(poll_data), 201
+
+
+@app.route('/api/polls/<int:poll_id>/vote', methods=['POST'])
+def vote_poll(poll_id):
+    """Vote on a poll"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    option_index = data.get('option')
+
+    if option_index is None:
+        return jsonify({'error': 'Option required'}), 400
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Check if poll exists and is not expired
+    cursor.execute('SELECT channel_id, expires_at FROM polls WHERE id = ?', (poll_id,))
+    poll = cursor.fetchone()
+    if not poll:
+        conn.close()
+        return jsonify({'error': 'Poll not found'}), 404
+
+    if poll['expires_at']:
+        expires = datetime.fromisoformat(poll['expires_at'])
+        if datetime.now() > expires:
+            conn.close()
+            return jsonify({'error': 'Poll has expired'}), 400
+
+    # Insert or update vote
+    try:
+        cursor.execute('''
+            INSERT OR REPLACE INTO poll_votes (poll_id, user_id, option_index)
+            VALUES (?, ?, ?)
+        ''', (poll_id, user_id, option_index))
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+    # Get updated poll data
+    poll_data = get_poll_data(cursor, poll_id, user_id)
+    conn.close()
+
+    # Broadcast poll update
+    broadcast_message(poll['channel_id'], {
+        'type': 'poll_update',
+        'data': poll_data
+    })
+
+    return jsonify(poll_data)
+
+
+def get_poll_data(cursor, poll_id, user_id):
+    """Helper function to get poll data with vote counts"""
+    cursor.execute('''
+        SELECT p.id, p.channel_id, p.question, p.options, p.created_at, p.expires_at,
+               u.username
+        FROM polls p
+        JOIN users u ON p.user_id = u.id
+        WHERE p.id = ?
+    ''', (poll_id,))
+    poll = dict(cursor.fetchone())
+    poll['options'] = json.loads(poll['options'])
+
+    # Get vote counts
+    cursor.execute('''
+        SELECT option_index, COUNT(*) as count
+        FROM poll_votes
+        WHERE poll_id = ?
+        GROUP BY option_index
+    ''', (poll_id,))
+    vote_counts = {row['option_index']: row['count'] for row in cursor.fetchall()}
+
+    # Get total votes
+    total_votes = sum(vote_counts.values())
+
+    # Check user's vote
+    cursor.execute('''
+        SELECT option_index FROM poll_votes
+        WHERE poll_id = ? AND user_id = ?
+    ''', (poll_id, user_id))
+    user_vote = cursor.fetchone()
+
+    poll['vote_counts'] = vote_counts
+    poll['total_votes'] = total_votes
+    poll['user_vote'] = user_vote['option_index'] if user_vote else None
+
+    return poll
 
 
 @app.route('/api/messages/<int:message_id>', methods=['DELETE'])

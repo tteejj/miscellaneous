@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  rpi-chat-dev:
+    build:
+      context: .
+      dockerfile: Containerfile.dev
+    container_name: rpi-chat-dev
+
+    ports:
+      - "5000:5000"
+
+    tmpfs:
+      - /app/tmp:size=50M,mode=1777
+
+    volumes:
+      # Mount source code for live development
+      - ./server.py:/app/server.py:ro
+      - ./database.py:/app/database.py:ro
+      - ./auth.py:/app/auth.py:ro
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
+
+      # Persistent data
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+
+    environment:
+      - FLASK_APP=server.py
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - DATABASE_PATH=/app/data/chat.db
+      - UPLOAD_FOLDER=/app/uploads
+      - TMP_FOLDER=/app/tmp
+
+    networks:
+      - rpi-chat-network
+
+networks:
+  rpi-chat-network:
+    driver: bridge

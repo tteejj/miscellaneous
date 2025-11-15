@@ -1,0 +1,41 @@
+# Development Containerfile - optimized for Pi Zero 2 W
+FROM python:3.11-slim-bookworm
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tini \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash chatuser
+
+WORKDIR /app
+
+# Copy requirements and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create directories
+RUN mkdir -p \
+    /app/uploads/thumbnails \
+    /app/uploads/files \
+    /app/uploads/avatars \
+    /app/data \
+    /app/tmp \
+    && chown -R chatuser:chatuser /app
+
+USER chatuser
+
+ENV PYTHONUNBUFFERED=1 \
+    FLASK_APP=server.py \
+    FLASK_ENV=development \
+    DATABASE_PATH=/app/data/chat.db \
+    UPLOAD_FOLDER=/app/uploads \
+    TMP_FOLDER=/app/tmp
+
+EXPOSE 5000
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# Development mode - single Flask process with debug
+CMD ["python", "server.py"]

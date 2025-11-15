@@ -1,0 +1,135 @@
+<!-- Compatibility & Responsive Support for Tiny Screens and Old Browsers -->
+<!-- Add this to the <head> section of your templates -->
+
+<!-- Viewport meta for mobile devices -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
+
+<!-- Compatibility meta tags -->
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="HandheldFriendly" content="true">
+<meta name="MobileOptimized" content="320">
+
+<!-- Theme colors for mobile browsers -->
+<meta name="theme-color" content="#667eea">
+<meta name="msapplication-TileColor" content="#667eea">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<!-- Prevent text size adjustment on iOS -->
+<style>
+    body {
+        -webkit-text-size-adjust: 100%;
+        -ms-text-size-adjust: 100%;
+    }
+</style>
+
+<!-- Compatibility detection (MUST load first, before any other scripts) -->
+<script src="/static/compat.js"></script>
+
+<!-- Responsive CSS for tiny screens and old browsers -->
+<link rel="stylesheet" href="/static/tiny-screens.css">
+
+<!-- PWA Manifest (optional, disable on very old browsers) -->
+<link rel="manifest" href="/static/manifest.json">
+
+<!-- Conditional comments for IE (if supporting IE8-9) -->
+<!--[if IE 8]>
+    <script>document.documentElement.className += ' ie8';</script>
+    <style>
+        /* IE8 specific fixes */
+        .sidebar { float: left; width: 200px; }
+        .chat-container { margin-left: 210px; }
+    </style>
+<![endif]-->
+
+<!--[if IE 9]>
+    <script>document.documentElement.className += ' ie9';</script>
+<![endif]-->
+
+<!-- HTML5 Shiv for IE8 (if needed) -->
+<!--[if lt IE 9]>
+    <script>
+        // HTML5 element support
+        'article aside footer header nav section'.split(' ').forEach(function(tag) {
+            document.createElement(tag);
+        });
+    </script>
+<![endif]-->
+
+<!-- No JavaScript fallback -->
+<noscript>
+    <style>
+        html { margin-top: 0 !important; }
+        .requires-js { display: none !important; }
+        .no-js-message {
+            display: block !important;
+            background: #ff9800;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10000;
+        }
+    </style>
+
+    <div class="noscript-warning">
+        <h2>⚠️ JavaScript is Disabled</h2>
+        <p>This chat application requires JavaScript to function properly.</p>
+        <p>Please enable JavaScript in your browser settings and reload this page.</p>
+    </div>
+
+    <div class="basic-usage-info">
+        <h3>Why JavaScript is needed:</h3>
+        <ul>
+            <li>Real-time message updates</li>
+            <li>Send and receive messages</li>
+            <li>View images and files</li>
+            <li>Interact with other users</li>
+        </ul>
+        <p><strong>Your browser:</strong> Check your browser's settings menu to enable JavaScript.</p>
+    </div>
+</noscript>
+
+<!-- Low bandwidth / slow connection detection -->
+<script>
+(function() {
+    // Detect slow connection
+    if (navigator.connection) {
+        var conn = navigator.connection;
+        var slowConnection = (
+            conn.effectiveType === 'slow-2g' ||
+            conn.effectiveType === '2g' ||
+            conn.saveData === true
+        );
+
+        if (slowConnection) {
+            document.documentElement.className += ' slow-connection';
+            console.log('Slow connection detected - enabling optimizations');
+
+            // Disable auto-loading of images
+            if (window.FeatureFlags) {
+                window.FeatureFlags.enableImageLazyLoad = false;
+                window.FeatureFlags.lowMemoryMode = true;
+            }
+        }
+    }
+
+    // Detect device memory (if available)
+    if (navigator.deviceMemory && navigator.deviceMemory < 2) {
+        document.documentElement.className += ' low-memory';
+        console.log('Low memory device detected (' + navigator.deviceMemory + 'GB)');
+
+        if (window.FeatureFlags) {
+            window.FeatureFlags.lowMemoryMode = true;
+        }
+    }
+})();
+</script>
+
+<!-- Preconnect to speed up resource loading (for modern browsers) -->
+<link rel="preconnect" href="/">
+<link rel="dns-prefetch" href="/">

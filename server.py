@@ -1121,6 +1121,12 @@ def upload_image(channel_id):
     return jsonify(new_message), 201
 
 
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files (CSS, JS, manifest, etc.) - public access"""
+    return send_from_directory('static', filename)
+
+
 @app.route('/uploads/<filename>')
 def serve_upload(filename):
     """Serve uploaded files"""

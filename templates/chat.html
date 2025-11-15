@@ -2384,11 +2384,41 @@
             }
         });
 
-        // Initialize
-        checkAdmin();
-        loadChannels();
-        loadEvents();
-        renderCalendar();
+        // Initialize app with compatibility checks
+        function initApp() {
+            // Log browser capabilities for debugging
+            if (window.BrowserCapabilities) {
+                console.log('Browser capabilities:', window.BrowserCapabilities);
+                console.log('Feature flags:', window.FeatureFlags);
+            }
+
+            // Initialize core app
+            checkAdmin();
+            loadChannels();
+            loadEvents();
+            renderCalendar();
+
+            // Show browser warning if needed
+            if (window.showBrowserInfo) {
+                window.showBrowserInfo();
+            }
+
+            // Register service worker for PWA (if supported)
+            if (window.FeatureFlags && window.FeatureFlags.enableServiceWorker && 'serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/static/sw.js').then(function(registration) {
+                    console.log('Service Worker registered:', registration);
+                }).catch(function(error) {
+                    console.log('Service Worker registration failed:', error);
+                });
+            }
+        }
+
+        // Wait for compat.js to load before initializing
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
     </script>
 </body>
 </html>
